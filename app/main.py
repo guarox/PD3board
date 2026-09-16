@@ -16,6 +16,7 @@ from app.engine.command_parser import CommandParser
 from app.engine.orderbook import OrderBook
 from app.engine.tick_buffer import TickBuffer
 from app.feeds.binance import BinanceFeed
+from app.feeds.coinbase import CoinbaseFeed
 from app.feeds.equities import EquitiesFeed
 from app.feeds.news import NewsFeed
 from app.feeds.yield_curve import YieldCurveFeed
@@ -107,6 +108,12 @@ binance_feed = BinanceFeed(
     on_depth=on_binance_depth
 )
 
+coinbase_feed = CoinbaseFeed(
+    symbol="BTC-USD",
+    on_tick=on_binance_tick,
+    on_depth=on_binance_depth
+)
+
 async def equities_broadcaster():
     """Background task to broadcast equities/indices updates periodically."""
     while True:
@@ -125,12 +132,14 @@ async def equities_broadcaster():
 async def startup_event():
     logger.info("Starting PD3board feeds...")
     await binance_feed.start()
+    await coinbase_feed.start()
     asyncio.create_task(equities_broadcaster())
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Stopping PD3board feeds...")
     await binance_feed.stop()
+    await coinbase_feed.stop()
 
 # Static Files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
