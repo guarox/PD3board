@@ -241,6 +241,7 @@ class TerminalController {
     this.ws.onopen = () => {
       if (latencyEl) latencyEl.innerText = 'WS: 12ms';
       this.loadHistoricalData(this.currentTicker);
+      this.loadOrderBook(this.currentTicker);
     };
 
     this.ws.onmessage = (event) => {
@@ -323,6 +324,21 @@ class TerminalController {
     }
   }
 
+  async loadOrderBook(ticker) {
+    try {
+      const res = await fetch(`/api/orderbook/${ticker}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (this.orderBookUI && data && data.bids && this.currentTicker === ticker) {
+          this.orderBookUI.update(data);
+          this.updateHeaderSpread(data);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load orderbook:', e);
+    }
+  }
+
   async executeCommand(rawCommand) {
     if (!rawCommand || !rawCommand.trim()) return;
     this.sound.playGoSound();
@@ -347,6 +363,7 @@ class TerminalController {
         if (symbolBadge) symbolBadge.innerText = `${this.currentTicker} ${this.currentSector}`;
 
         this.loadHistoricalData(this.currentTicker);
+        this.loadOrderBook(this.currentTicker);
         if (this.cmdInput) this.cmdInput.value = '';
       }
     } catch (err) {
