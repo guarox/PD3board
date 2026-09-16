@@ -327,6 +327,7 @@ class PriceChart {
     const marginBottom = 25;
     const marginTop = 24;
     const plotWidth = this.width - marginRight;
+    const totalPlotHeight = this.height - marginTop - marginBottom;
     // Allocate height if RSI or MACD is enabled
     const rsiActive = this.indicators.RSI;
     const macdActive = this.indicators.MACD;
