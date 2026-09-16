@@ -61,20 +61,35 @@ tick_buffers: Dict[str, TickBuffer] = {
 
 def get_or_create_tick_buffer(sym: str) -> TickBuffer:
     sym = sym.upper()
-    expected_price = equities_feed.get_security_price(sym)
     if sym in tick_buffers:
         tb = tick_buffers[sym]
-        recent = tb.get_recent_ticks(1)
-        # Check if buffer was corrupted with old default 150.0 value when expected price differs significantly
-        if recent and abs(recent[0]["price"] - expected_price) > (expected_price * 0.35):
-            tb.candles.clear()
-            tb.ticks.clear()
-        else:
+        if tb.candles:
             return tb
     else:
         tb = TickBuffer(sym)
         tick_buffers[sym] = tb
 
+    # 1. Try loading real historical 1-minute intraday candles
+    real_candles = equities_feed.get_historical_candles(sym)
+    if real_candles:
+        for c in real_candles:
+            b_time = int(c["time"])
+            tb.candles[b_time] = Candle(
+                time=b_time,
+                open=c["open"],
+                high=c["high"],
+                low=c["low"],
+                close=c["close"],
+                volume=c["volume"]
+            )
+            tb.ticks.append(Tick(timestamp=b_time + 10, price=c["open"], size=max(1.0, c["volume"] * 0.25), side="buy"))
+            tb.ticks.append(Tick(timestamp=b_time + 25, price=c["high"], size=max(1.0, c["volume"] * 0.25), side="buy"))
+            tb.ticks.append(Tick(timestamp=b_time + 40, price=c["low"], size=max(1.0, c["volume"] * 0.25), side="sell"))
+            tb.ticks.append(Tick(timestamp=b_time + 55, price=c["close"], size=max(1.0, c["volume"] * 0.25), side="buy" if c["close"] >= c["open"] else "sell"))
+        return tb
+
+    # 2. Fallback to generating simulated historical candles around current security price
+    expected_price = equities_feed.get_security_price(sym)
     base_price = expected_price
     now_ts = time.time()
     current_minute = int(now_ts // 60) * 60
@@ -125,7 +140,7 @@ def get_or_create_orderbook(sym: str) -> OrderBook:
 
     ob = orderbooks[sym]
     if not ob.bids or sym != Config.DEFAULT_CRYPTO:
-        price = equities_feed.get_security_price(sym)
+        price = equities_feed.get_security_price(sym, prefer_live=True)
         if price >= 10000:
             tick = 0.50
         elif price >= 1000:
@@ -162,8 +177,7 @@ async def broadcast(message: Dict[str, Any]):
             await ws.send_text(payload)
         except Exception:
             dead_connections.add(ws)
-    for ws in dead_connections:
-        active_connections.discard(ws)
+    active_connections.difference_update(dead_connections)
 
 async def on_binance_tick(symbol: str, price: float, size: float, side: str):
     if symbol not in tick_buffers:
@@ -211,17 +225,25 @@ async def equities_broadcaster():
                     "type": "equities_update",
                     "data": updates
                 })
-                # Update in-memory tick buffers and order books for active equities & indices
+                # Update in-memory tick buffers, order books, and broadcast live ticks
                 for item in updates:
                     sym = item["symbol"]
                     price = item["price"]
                     chg = item["change"]
                     if sym in tick_buffers:
-                        tick_buffers[sym].add_tick(
+                        tick = tick_buffers[sym].add_tick(
                             price=price,
                             size=round(50.0 + (hash(f"{sym}_{price}") % 50), 1),
                             side="buy" if chg >= 0 else "sell"
                         )
+                        await broadcast({
+                            "type": "tick",
+                            "symbol": sym,
+                            "price": price,
+                            "size": round(50.0 + (hash(f"{sym}_{price}") % 50), 1),
+                            "side": "buy" if chg >= 0 else "sell",
+                            "timestamp": tick.timestamp
+                        })
                     if sym in orderbooks and sym != Config.DEFAULT_CRYPTO:
                         ob = orderbooks[sym]
                         tick = 0.50 if price >= 10000 else (0.25 if price >= 1000 else (0.05 if price >= 100 else 0.01))
@@ -248,14 +270,13 @@ async def startup_event():
     for sym in list(equities_feed.equities.keys()) + list(equities_feed.indices.keys()):
         get_or_create_tick_buffer(sym)
         get_or_create_orderbook(sym)
-    await binance_feed.start()
+    # Start Coinbase live feed (Binance passive in US IP environment)
     await coinbase_feed.start()
     asyncio.create_task(equities_broadcaster())
 
 @app.on_event("shutdown")
 async def shutdown_event():
     logger.info("Stopping PD3board feeds...")
-    await binance_feed.stop()
     await coinbase_feed.stop()
 
 

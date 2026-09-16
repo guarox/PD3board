@@ -1,15 +1,182 @@
 import asyncio
+import copy
+import json
+import logging
 import random
 import time
-from typing import Dict, Any, List
+import urllib.request
+from typing import Dict, Any, List, Optional
+
+logger = logging.getLogger(__name__)
+
+SYMBOL_MAP = {
+    "SPX": "^GSPC",
+    "NDX": "^IXIC",
+    "DJI": "^DJI",
+    "RUT": "^RUT",
+    "VIX": "^VIX",
+    "FTSE": "^FTSE",
+    "N225": "^N225",
+    "DAX": "^GDAXI",
+    "BTC": "BTC-USD",
+    "BTCUSD": "BTC-USD",
+    "BTCUSDT": "BTC-USD",
+    "ETH": "ETH-USD",
+    "ETHUSD": "ETH-USD",
+    "ETHUSDT": "ETH-USD",
+    "SOL": "SOL-USD",
+    "SOLUSD": "SOL-USD",
+    "SOLUSDT": "SOL-USD",
+}
+
+PRIVATE_SECURITIES: Dict[str, Dict[str, Any]] = {
+    "SPACEX": {
+        "symbol": "SPACEX",
+        "name": "SPACE EXPLORATION TECHNOLOGIES CORP (SPACEX)",
+        "sector": "EQUITY",
+        "industry": "Commercial Aerospace / Satellite Internet (Starlink) & Lunar Transport",
+        "exchange": "PRIVATE / UNLISTED",
+        "price": 112.00,
+        "prev_close": 112.00,
+        "pe": "N/A",
+        "fwd_pe": "N/A",
+        "eps": "N/A",
+        "market_cap": "210.0B",
+        "shares_out": "1.875B (Est.)",
+        "div_yield": "0.00%",
+        "ex_div_date": "N/A",
+        "beta": 1.45,
+        "range_52w": "97.00 - 112.00",
+        "day_range": "112.00 - 112.00",
+        "volume": 0,
+        "ceo": "Elon Musk",
+        "hq": "Starbase / Hawthorne, TX",
+        "revenue": "13.3B (Est.)",
+        "net_income": "3.2B (Est.)",
+        "currency": "USD",
+        "status": "UNLISTED / PRIVATE (Secondary Tender Offer)",
+        "description": "Commercial space transportation, orbital rocketry, and global low-Earth orbit Starlink constellation."
+    },
+    "SPCX": {
+        "symbol": "SPCX",
+        "name": "SPACE EXPLORATION (SPACEX / SPACE SECTOR)",
+        "sector": "EQUITY",
+        "industry": "Commercial Space & Orbital Launch Infrastructure",
+        "exchange": "PRIVATE / UNLISTED",
+        "price": 112.00,
+        "prev_close": 112.00,
+        "pe": "N/A",
+        "fwd_pe": "N/A",
+        "eps": "N/A",
+        "market_cap": "210.0B",
+        "shares_out": "1.875B (Est.)",
+        "div_yield": "0.00%",
+        "ex_div_date": "N/A",
+        "beta": 1.45,
+        "range_52w": "97.00 - 112.00",
+        "day_range": "112.00 - 112.00",
+        "volume": 0,
+        "ceo": "Elon Musk",
+        "hq": "Starbase / Hawthorne, TX",
+        "revenue": "13.3B (Est.)",
+        "net_income": "3.2B (Est.)",
+        "currency": "USD",
+        "status": "UNLISTED / PRIVATE (Secondary Tender Offer)",
+        "description": "Commercial space transportation, orbital rocketry, and global low-Earth orbit Starlink constellation."
+    },
+    "OPENAI": {
+        "symbol": "OPENAI",
+        "name": "OPENAI OPCO, LLC",
+        "sector": "EQUITY",
+        "industry": "Frontier Artificial Intelligence & Foundation Models",
+        "exchange": "PRIVATE / UNLISTED",
+        "price": 150.00,
+        "prev_close": 150.00,
+        "pe": "N/A",
+        "fwd_pe": "N/A",
+        "eps": "N/A",
+        "market_cap": "157.0B",
+        "shares_out": "1.05B (Est.)",
+        "div_yield": "0.00%",
+        "ex_div_date": "N/A",
+        "beta": 2.10,
+        "range_52w": "86.00 - 150.00",
+        "day_range": "150.00 - 150.00",
+        "volume": 0,
+        "ceo": "Sam Altman",
+        "hq": "San Francisco, CA",
+        "revenue": "4.0B (Est.)",
+        "net_income": "-5.0B (Est.)",
+        "currency": "USD",
+        "status": "UNLISTED / PRIVATE",
+        "description": "Pioneering Artificial General Intelligence (AGI) research, ChatGPT, GPT-4, and frontier neural models."
+    },
+    "STRIPE": {
+        "symbol": "STRIPE",
+        "name": "STRIPE, INC.",
+        "sector": "EQUITY",
+        "industry": "Global Payments & Financial Infrastructure",
+        "exchange": "PRIVATE / UNLISTED",
+        "price": 28.00,
+        "prev_close": 28.00,
+        "pe": "N/A",
+        "fwd_pe": "N/A",
+        "eps": "N/A",
+        "market_cap": "70.0B",
+        "shares_out": "2.5B (Est.)",
+        "div_yield": "0.00%",
+        "ex_div_date": "N/A",
+        "beta": 1.20,
+        "range_52w": "20.00 - 28.00",
+        "day_range": "28.00 - 28.00",
+        "volume": 0,
+        "ceo": "Patrick Collison",
+        "hq": "South San Francisco, CA / Dublin",
+        "revenue": "14.5B (Est.)",
+        "net_income": "N/A",
+        "currency": "USD",
+        "status": "UNLISTED / PRIVATE",
+        "description": "Financial infrastructure platform processing hundreds of billions in global digital commerce."
+    },
+    "ANTHROPIC": {
+        "symbol": "ANTHROPIC",
+        "name": "ANTHROPIC PBC",
+        "sector": "EQUITY",
+        "industry": "AI Safety & Foundation Models (Claude)",
+        "exchange": "PRIVATE / UNLISTED",
+        "price": 35.00,
+        "prev_close": 35.00,
+        "pe": "N/A",
+        "fwd_pe": "N/A",
+        "eps": "N/A",
+        "market_cap": "40.0B",
+        "shares_out": "1.14B (Est.)",
+        "div_yield": "0.00%",
+        "ex_div_date": "N/A",
+        "beta": 1.90,
+        "range_52w": "18.00 - 35.00",
+        "day_range": "35.00 - 35.00",
+        "volume": 0,
+        "ceo": "Dario Amodei",
+        "hq": "San Francisco, CA",
+        "revenue": "1.0B (Est.)",
+        "net_income": "N/A",
+        "currency": "USD",
+        "status": "UNLISTED / PRIVATE",
+        "description": "AI safety and frontier research lab developing the Claude family of foundation models."
+    }
+}
 
 class EquitiesFeed:
     """
     World Equity Indices (WEI) and US Equities data provider.
     Streams intraday ticks, net change, and percentage change.
-    Provides fundamental institutional descriptions (DES).
+    Provides fundamental institutional descriptions (DES), financial statements (FA),
+    analyst recommendations (ANR), and real-time upstream market data integration.
     """
     def __init__(self):
+        self.live_cache: Dict[str, Dict[str, Any]] = {}
+
         self.indices: Dict[str, Dict[str, Any]] = {
             "SPX": {"name": "S&P 500 INDEX", "price": 5625.80, "prev_close": 5595.75, "high": 5638.10, "low": 5588.20},
             "NDX": {"name": "NASDAQ 100", "price": 19680.40, "prev_close": 19520.10, "high": 19740.00, "low": 19480.50},
@@ -152,17 +319,17 @@ class EquitiesFeed:
                 "sector": "CRNCY",
                 "industry": "Decentralized Digital Asset / Layer 1",
                 "exchange": "COINBASE",
-                "price": 64500.00,
-                "prev_close": 63900.00,
+                "price": 76250.00,
+                "prev_close": 75500.00,
                 "pe": "N/A",
                 "fwd_pe": "N/A",
                 "eps": "N/A",
-                "mkt_cap": "1.27T",
+                "mkt_cap": "1.50T",
                 "shares_out": "19.75M BTC",
                 "div_yield": "N/A",
                 "ex_div_date": "N/A",
                 "beta": 2.85,
-                "range_52w": "26,500 - 73,750",
+                "range_52w": "52,000 - 76,500",
                 "ceo": "Satoshi Nakamoto",
                 "hq": "Decentralized / P2P",
                 "revenue": "N/A",
@@ -170,18 +337,97 @@ class EquitiesFeed:
             }
         }
 
+    def fetch_live_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        sym = symbol.upper().strip()
+        now = time.time()
+        if sym in self.live_cache and self.live_cache[sym]["expires"] > now:
+            return self.live_cache[sym]["data"]
+
+        target = SYMBOL_MAP.get(sym, sym)
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}?interval=1m&range=1d"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=3.5) as res:
+                payload = json.loads(res.read().decode())
+                chart = payload.get("chart", {})
+                res_list = chart.get("result")
+                if not res_list:
+                    return None
+                res_obj = res_list[0]
+                meta = res_obj.get("meta", {})
+                timestamps = res_obj.get("timestamp", [])
+                indicators = res_obj.get("indicators", {}).get("quote", [{}])[0]
+
+                candles = []
+                opens = indicators.get("open", [])
+                highs = indicators.get("high", [])
+                lows = indicators.get("low", [])
+                closes = indicators.get("close", [])
+                volumes = indicators.get("volume", [])
+
+                for i, ts in enumerate(timestamps):
+                    if i < len(opens) and i < len(closes):
+                        o = opens[i]
+                        h = highs[i]
+                        l = lows[i]
+                        c = closes[i]
+                        v = volumes[i] if i < len(volumes) and volumes[i] is not None else 0
+                        if None not in (o, h, l, c):
+                            candles.append({
+                                "time": int(ts),
+                                "open": round(float(o), 2),
+                                "high": round(float(h), 2),
+                                "low": round(float(l), 2),
+                                "close": round(float(c), 2),
+                                "volume": round(float(v), 1)
+                            })
+
+                price = meta.get("regularMarketPrice")
+                prev_close = meta.get("chartPreviousClose") or meta.get("previousClose") or price
+                if price is None and candles:
+                    price = candles[-1]["close"]
+
+                quote_data = {
+                    "symbol": sym,
+                    "name": meta.get("shortName") or meta.get("longName") or sym,
+                    "price": round(float(price), 2) if price is not None else 100.0,
+                    "prev_close": round(float(prev_close), 2) if prev_close is not None else round(float(price or 100.0), 2),
+                    "day_high": meta.get("regularMarketDayHigh"),
+                    "day_low": meta.get("regularMarketDayLow"),
+                    "range_52w": f"{meta.get('fiftyTwoWeekLow', 'N/A')} - {meta.get('fiftyTwoWeekHigh', 'N/A')}",
+                    "volume": meta.get("regularMarketVolume", 0),
+                    "exchange": meta.get("exchangeName", "US"),
+                    "currency": meta.get("currency", "USD"),
+                    "candles": candles
+                }
+                self.live_cache[sym] = {"data": quote_data, "expires": now + 15.0}
+                return quote_data
+        except Exception as e:
+            logger.debug(f"Live market quote fetch failed for {symbol}: {e}")
+            return None
+
+    def get_historical_candles(self, symbol: str) -> List[Dict[str, Any]]:
+        quote = self.fetch_live_quote(symbol)
+        if quote and quote.get("candles"):
+            return quote["candles"]
+        return []
+
     def update_ticks(self) -> List[Dict[str, Any]]:
-        """Simulates subtle market tick fluctuations."""
+        """Simulates subtle market tick fluctuations around current prices."""
         updated = []
         for symbol, data in {**self.indices, **self.equities}.items():
             if random.random() < 0.4:
-                drift = (random.random() - 0.48) * (data["price"] * 0.0004)
-                data["price"] = round(data["price"] + drift, 2)
-                chg = round(data["price"] - data["prev_close"], 2)
-                chg_pct = round((chg / data["prev_close"]) * 100, 2)
+                quote = self.live_cache.get(symbol, {}).get("data")
+                curr_price = quote["price"] if quote else data["price"]
+                prev_close = quote["prev_close"] if quote else data["prev_close"]
+                drift = (random.random() - 0.48) * (curr_price * 0.0004)
+                new_price = round(curr_price + drift, 2)
+                chg = round(new_price - prev_close, 2)
+                chg_pct = round((chg / prev_close) * 100, 2) if prev_close else 0.0
                 updated.append({
                     "symbol": symbol,
-                    "price": data["price"],
+                    "price": new_price,
                     "change": chg,
                     "change_pct": chg_pct,
                     "timestamp": time.time()
@@ -191,42 +437,86 @@ class EquitiesFeed:
     def get_wei_matrix(self) -> List[Dict[str, Any]]:
         matrix = []
         for symbol, data in self.indices.items():
-            chg = round(data["price"] - data["prev_close"], 2)
-            chg_pct = round((chg / data["prev_close"]) * 100, 2)
+            quote = self.fetch_live_quote(symbol)
+            if quote:
+                price = quote["price"]
+                prev_close = quote["prev_close"]
+                chg = round(price - prev_close, 2)
+                chg_pct = round((chg / prev_close) * 100, 2) if prev_close else 0.0
+                high = quote.get("day_high") or price
+                low = quote.get("day_low") or price
+            else:
+                price = data["price"]
+                chg = round(data["price"] - data["prev_close"], 2)
+                chg_pct = round((chg / data["prev_close"]) * 100, 2)
+                high = data["high"]
+                low = data["low"]
+
             matrix.append({
                 "symbol": symbol,
                 "name": data["name"],
-                "price": data["price"],
+                "price": price,
                 "change": chg,
                 "change_pct": chg_pct,
-                "high": data["high"],
-                "low": data["low"]
+                "high": high,
+                "low": low
             })
         return matrix
 
-    def get_security_price(self, symbol: str) -> float:
+    def get_security_price(self, symbol: str, prefer_live: bool = False) -> float:
         sym = symbol.upper()
+        if sym in PRIVATE_SECURITIES:
+            return float(PRIVATE_SECURITIES[sym]["price"])
+
+        if prefer_live:
+            quote = self.fetch_live_quote(sym)
+            if quote and quote.get("price"):
+                return float(quote["price"])
+
         if sym in self.equities:
             return float(self.equities[sym]["price"])
         if sym in self.indices:
             return float(self.indices[sym]["price"])
+
+        quote = self.fetch_live_quote(sym)
+        if quote and quote.get("price"):
+            return float(quote["price"])
+
         return 100.0
 
     def get_security_description(self, symbol: str) -> Dict[str, Any]:
         sym = symbol.upper()
+        if sym in PRIVATE_SECURITIES:
+            sec = copy.deepcopy(PRIVATE_SECURITIES[sym])
+            chg = round(sec["price"] - sec["prev_close"], 2)
+            chg_pct = round((chg / sec["prev_close"]) * 100, 2) if sec["prev_close"] else 0.0
+            sec["change"] = chg
+            sec["change_pct"] = chg_pct
+            return sec
+
         if sym in self.equities:
-            eq = self.equities[sym]
+            eq = copy.deepcopy(self.equities[sym])
             chg = round(eq["price"] - eq["prev_close"], 2)
             chg_pct = round((chg / eq["prev_close"]) * 100, 2)
+            quote = self.fetch_live_quote(sym)
+            if quote:
+                eq["live_price"] = quote["price"]
+                eq["live_change"] = round(quote["price"] - quote["prev_close"], 2)
+                eq["live_change_pct"] = round((eq["live_change"] / quote["prev_close"]) * 100, 2) if quote["prev_close"] else 0.0
+                if quote.get("range_52w") and quote["range_52w"] != "N/A - N/A":
+                    eq["range_52w"] = quote["range_52w"]
+                if quote.get("volume"):
+                    eq["volume"] = quote["volume"]
+
             return {
                 "symbol": sym,
                 "name": eq["name"],
                 "sector": eq["sector"],
                 "industry": eq.get("industry", "Financial & Tech Services"),
                 "exchange": eq.get("exchange", "NASDAQ"),
-                "price": eq["price"],
-                "change": chg,
-                "change_pct": chg_pct,
+                "price": eq.get("live_price", eq["price"]),
+                "change": eq.get("live_change", chg),
+                "change_pct": eq.get("live_change_pct", chg_pct),
                 "pe": eq.get("pe", "N/A"),
                 "fwd_pe": eq.get("fwd_pe", "N/A"),
                 "eps": eq.get("eps", "N/A"),
@@ -243,9 +533,15 @@ class EquitiesFeed:
                 "currency": "USD"
             }
         elif sym in self.indices:
-            idx = self.indices[sym]
+            idx = copy.deepcopy(self.indices[sym])
             chg = round(idx["price"] - idx["prev_close"], 2)
             chg_pct = round((chg / idx["prev_close"]) * 100, 2)
+            quote = self.fetch_live_quote(sym)
+            price = quote["price"] if quote else idx["price"]
+            if quote:
+                chg = round(price - quote["prev_close"], 2)
+                chg_pct = round((chg / quote["prev_close"]) * 100, 2) if quote["prev_close"] else 0.0
+
             return {
                 "symbol": sym,
                 "name": idx["name"],
@@ -253,7 +549,7 @@ class EquitiesFeed:
                 "industry": "Broad Market Benchmark / Equity Index",
                 "description": f"Benchmark equity index representing {idx['name']} components.",
                 "exchange": "CBOE / NYSE / NASDAQ",
-                "price": idx["price"],
+                "price": price,
                 "change": chg,
                 "change_pct": chg_pct,
                 "pe": 25.8,
@@ -264,13 +560,46 @@ class EquitiesFeed:
                 "div_yield": "1.48%",
                 "ex_div_date": "Quarterly",
                 "beta": 1.00,
-                "range_52w": f"{round(idx['price'] * 0.82, 2)} - {round(idx['price'] * 1.08, 2)}",
+                "range_52w": f"{round(price * 0.82, 2)} - {round(price * 1.08, 2)}",
                 "ceo": "Index Committee",
                 "hq": "New York, NY",
                 "revenue": "2.1T (Components)",
                 "net_income": "285B (Components)",
                 "currency": "USD"
             }
+
+        # Any other US equity, ETF, or commodity
+        quote = self.fetch_live_quote(sym)
+        if quote:
+            chg = round(quote["price"] - quote["prev_close"], 2)
+            chg_pct = round((chg / quote["prev_close"]) * 100, 2) if quote["prev_close"] else 0.0
+            return {
+                "symbol": sym,
+                "name": quote["name"].upper(),
+                "sector": "EQUITY",
+                "industry": "US Equities & Exchange Traded Funds",
+                "exchange": quote.get("exchange", "NASDAQ"),
+                "price": quote["price"],
+                "change": chg,
+                "change_pct": chg_pct,
+                "pe": "N/A",
+                "fwd_pe": "N/A",
+                "eps": "N/A",
+                "market_cap": f"{round(quote['price'] * 0.45, 1)}B" if quote.get("volume") else "N/A",
+                "shares_out": "N/A",
+                "div_yield": "N/A",
+                "ex_div_date": "N/A",
+                "beta": 1.15,
+                "range_52w": quote.get("range_52w", "N/A"),
+                "day_range": f"{quote.get('day_low', 'N/A')} - {quote.get('day_high', 'N/A')}",
+                "volume": quote.get("volume", 0),
+                "ceo": "Executive Leadership",
+                "hq": "United States",
+                "revenue": "N/A",
+                "net_income": "N/A",
+                "currency": quote.get("currency", "USD")
+            }
+
         return {
             "symbol": sym,
             "name": f"{sym} CORP",
@@ -362,7 +691,7 @@ class EquitiesFeed:
             ]
         })
 
-        upside = round(((profile["target_price"] - price) / price) * 100, 2)
+        upside = round(((profile["target_price"] - price) / price) * 100, 2) if price else 0.0
         return {
             "symbol": sym,
             "price": price,
@@ -533,4 +862,3 @@ class EquitiesFeed:
                 {"quarter": "Q4 2026E", "consensus_eps": 3.20, "high_eps": 3.38, "low_eps": 3.10, "est_revenue": "6.95B"}
             ]
         }
-
