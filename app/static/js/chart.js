@@ -105,9 +105,15 @@ class PriceChart {
   }
 
   updateLiveTick(price, size) {
+    if (!price || isNaN(price)) return;
     this.currentPrice = price;
     if (this.candles.length > 0) {
       const last = this.candles[this.candles.length - 1];
+      // Defensive outlier guard: prevent mismatched cross-asset ticks from distorting the candle
+      const refPrice = last.close || last.open;
+      if (refPrice > 0 && Math.abs(price - refPrice) / refPrice > 0.35) {
+        return;
+      }
       last.high = Math.max(last.high, price);
       last.low = Math.min(last.low, price);
       last.close = price;
@@ -184,12 +190,13 @@ class PriceChart {
 
     // Calculate dynamic candle width with zoom and pan
     const baseCandleWidth = Math.max(2, Math.floor(plotWidth / (this.candles.length * 1.5)));
-    const candleWidth = Math.max(2, Math.floor(baseCandleWidth * this.zoomLevel));
-    const gap = Math.max(1, Math.floor(candleWidth * 0.5));
+    const candleWidth = Math.min(32, Math.max(3, Math.floor(baseCandleWidth * this.zoomLevel)));
+    const gap = Math.max(1, Math.floor(candleWidth * 0.4));
     const totalCandleSpan = candleWidth + gap;
 
-    // Bounded pan offset
+    // Bounded pan offset and right-alignment
     const totalContentWidth = this.candles.length * totalCandleSpan;
+    const rightAlignOffset = (totalContentWidth < plotWidth) ? (plotWidth - totalContentWidth - 15) : 10;
     const minPan = Math.min(0, plotWidth - totalContentWidth - 20);
     const maxPan = 20;
     this.panOffset = Math.max(minPan, Math.min(maxPan, this.panOffset));
@@ -200,7 +207,7 @@ class PriceChart {
     // Draw Candles & Volume Bars
     for (let i = 0; i < this.candles.length; i++) {
       const c = this.candles[i];
-      const x = 10 + i * totalCandleSpan + this.panOffset;
+      const x = rightAlignOffset + i * totalCandleSpan + this.panOffset;
       if (x + candleWidth < 0 || x > plotWidth) continue;
 
       const isUp = c.close >= c.open;

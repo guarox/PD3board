@@ -73,3 +73,21 @@ def test_coinbase_feed_instantiation():
     feed = CoinbaseFeed(symbol="BTC-USD")
     assert feed.unified_symbol == "BTCUSD"
     assert feed.running is False
+
+def test_index_security_price_and_des():
+    feed = EquitiesFeed()
+    spx_price = feed.get_security_price("SPX")
+    assert spx_price > 5000.0
+
+    ndx_price = feed.get_security_price("NDX")
+    assert ndx_price > 18000.0
+
+    mcd_price = feed.get_security_price("MCD")
+    assert 280.0 < mcd_price < 350.0
+
+    spx_des = feed.get_security_description("SPX")
+    assert spx_des["symbol"] == "SPX"
+    assert spx_des["name"] == "S&P 500 INDEX"
+    assert "benchmark" in spx_des["description"].lower() or "benchmark" in spx_des["name"].lower()
+    assert spx_des["exchange"] == "CBOE / NYSE / NASDAQ"
+

@@ -204,6 +204,14 @@ class EquitiesFeed:
             })
         return matrix
 
+    def get_security_price(self, symbol: str) -> float:
+        sym = symbol.upper()
+        if sym in self.equities:
+            return float(self.equities[sym]["price"])
+        if sym in self.indices:
+            return float(self.indices[sym]["price"])
+        return 100.0
+
     def get_security_description(self, symbol: str) -> Dict[str, Any]:
         sym = symbol.upper()
         if sym in self.equities:
@@ -234,6 +242,35 @@ class EquitiesFeed:
                 "net_income": eq.get("net_income", "N/A"),
                 "currency": "USD"
             }
+        elif sym in self.indices:
+            idx = self.indices[sym]
+            chg = round(idx["price"] - idx["prev_close"], 2)
+            chg_pct = round((chg / idx["prev_close"]) * 100, 2)
+            return {
+                "symbol": sym,
+                "name": idx["name"],
+                "sector": "INDEX",
+                "industry": "Broad Market Benchmark / Equity Index",
+                "description": f"Benchmark equity index representing {idx['name']} components.",
+                "exchange": "CBOE / NYSE / NASDAQ",
+                "price": idx["price"],
+                "change": chg,
+                "change_pct": chg_pct,
+                "pe": 25.8,
+                "fwd_pe": 22.4,
+                "eps": 218.05,
+                "market_cap": "46.2T",
+                "shares_out": "500 Components",
+                "div_yield": "1.48%",
+                "ex_div_date": "Quarterly",
+                "beta": 1.00,
+                "range_52w": f"{round(idx['price'] * 0.82, 2)} - {round(idx['price'] * 1.08, 2)}",
+                "ceo": "Index Committee",
+                "hq": "New York, NY",
+                "revenue": "2.1T (Components)",
+                "net_income": "285B (Components)",
+                "currency": "USD"
+            }
         return {
             "symbol": sym,
             "name": f"{sym} CORP",
@@ -258,3 +295,4 @@ class EquitiesFeed:
             "net_income": "1.5B",
             "currency": "USD"
         }
+
