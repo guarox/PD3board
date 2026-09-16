@@ -25,6 +25,7 @@ class EquitiesFeed:
             "MSFT": {"name": "MICROSOFT CORP", "sector": "EQUITY", "price": 435.20, "prev_close": 432.80, "pe": 35.1, "mkt_cap": "3.23T"},
             "TSLA": {"name": "TESLA INC", "sector": "EQUITY", "price": 230.15, "prev_close": 226.70, "pe": 62.4, "mkt_cap": "735.8B"},
             "GOOGL": {"name": "ALPHABET INC", "sector": "EQUITY", "price": 162.40, "prev_close": 160.85, "pe": 24.3, "mkt_cap": "2.01T"},
+            "MCD": {"name": "MCDONALD'S CORP", "sector": "EQUITY", "price": 298.50, "prev_close": 296.80, "pe": 26.4, "mkt_cap": "214.5B"},
         }
 
     def update_ticks(self) -> List[Dict[str, Any]]:
