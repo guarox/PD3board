@@ -22,6 +22,10 @@ from app.feeds.news import NewsFeed
 from app.feeds.yield_curve import YieldCurveFeed
 from app.feeds.eco import EcoFeed
 from app.feeds.world_macro import WorldMacroFeed
+from app.feeds.options import OptionsFeed
+from app.feeds.market_heatmap import MarketHeatmapFeed
+from app.feeds.insider_holdings import InsiderHoldingsFeed
+from app.feeds.ai_research import AIResearchFeed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("pd3board")
@@ -42,6 +46,10 @@ news_feed = NewsFeed()
 yield_curve_feed = YieldCurveFeed()
 eco_feed = EcoFeed()
 world_macro_feed = WorldMacroFeed()
+options_feed = OptionsFeed()
+market_heatmap_feed = MarketHeatmapFeed()
+insider_holdings_feed = InsiderHoldingsFeed()
+ai_research_feed = AIResearchFeed()
 
 # Global In-Memory State
 orderbooks: Dict[str, OrderBook] = {
@@ -316,6 +324,18 @@ async def execute_command(req: CommandRequest):
         data = {"commodities": world_macro_feed.get_fdm()}
     elif fn == "ECO":
         data = {"events": eco_feed.get_events()}
+    elif fn == "OMON":
+        price = equities_feed.get_security_price(ticker)
+        data = options_feed.get_options_chain(ticker, price)
+    elif fn == "MAPS":
+        data = market_heatmap_feed.get_market_heatmap()
+    elif fn == "INSD":
+        data = insider_holdings_feed.get_insider_transactions(ticker)
+    elif fn == "HDS":
+        data = insider_holdings_feed.get_institutional_holders(ticker)
+    elif fn == "AI":
+        price = equities_feed.get_security_price(ticker)
+        data = ai_research_feed.generate_research_memo(ticker, price)
     elif fn == "HELP":
         data = {
             "help": [
@@ -327,6 +347,11 @@ async def execute_command(req: CommandRequest):
                 {"mnemonic": "FA", "desc": "Financial Analysis 5-Year Statements (Income, Balance, Cash Flow)"},
                 {"mnemonic": "RV", "desc": "Relative Valuation Peer Comparison Matrix (Multiples & Ratios)"},
                 {"mnemonic": "EE", "desc": "Earnings & Estimates (Quarterly Surprises & Forward Guidance)"},
+                {"mnemonic": "OMON", "desc": "Options Chain & Greeks Engine (Delta, Gamma, Theta, Vega, Max Pain)"},
+                {"mnemonic": "MAPS", "desc": "S&P 500 Market Treemap / Heatmap by GICS Sectors & Performance"},
+                {"mnemonic": "INSD", "desc": "SEC Form 4 Insider Trading Ledger (C-Suite & Director Trades)"},
+                {"mnemonic": "HDS", "desc": "13F Institutional Major Holders & Float Ownership Breakdown"},
+                {"mnemonic": "AI", "desc": "Autonomous AI Equity Research Analyst Investment Memo"},
                 {"mnemonic": "WIRP", "desc": "World Interest Rate Probabilities (FOMC Rate Hike/Cut Probabilities)"},
                 {"mnemonic": "WCRS", "desc": "World Currency Ranker (Global FX Performance vs USD)"},
                 {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
@@ -390,6 +415,30 @@ async def get_wcrs():
 async def get_fdm():
     return world_macro_feed.get_fdm()
 
+@app.get("/api/options/{symbol}")
+async def get_options(symbol: str):
+    sym = symbol.upper()
+    price = equities_feed.get_security_price(sym)
+    return options_feed.get_options_chain(sym, price)
+
+@app.get("/api/heatmap")
+async def get_heatmap():
+    return market_heatmap_feed.get_market_heatmap()
+
+@app.get("/api/insiders/{symbol}")
+async def get_insiders(symbol: str):
+    return insider_holdings_feed.get_insider_transactions(symbol)
+
+@app.get("/api/holders/{symbol}")
+async def get_holders(symbol: str):
+    return insider_holdings_feed.get_institutional_holders(symbol)
+
+@app.get("/api/research/{symbol}")
+async def get_research(symbol: str):
+    sym = symbol.upper()
+    price = equities_feed.get_security_price(sym)
+    return ai_research_feed.generate_research_memo(sym, price)
+
 @app.get("/api/help")
 async def get_help():
     return {
@@ -402,6 +451,11 @@ async def get_help():
             {"mnemonic": "FA", "desc": "Financial Analysis 5-Year Statements (Income, Balance, Cash Flow)"},
             {"mnemonic": "RV", "desc": "Relative Valuation Peer Comparison Matrix (Multiples & Ratios)"},
             {"mnemonic": "EE", "desc": "Earnings & Estimates (Quarterly Surprises & Forward Guidance)"},
+            {"mnemonic": "OMON", "desc": "Options Chain & Greeks Engine (Delta, Gamma, Theta, Vega, Max Pain)"},
+            {"mnemonic": "MAPS", "desc": "S&P 500 Market Treemap / Heatmap by GICS Sectors & Performance"},
+            {"mnemonic": "INSD", "desc": "SEC Form 4 Insider Trading Ledger (C-Suite & Director Trades)"},
+            {"mnemonic": "HDS", "desc": "13F Institutional Major Holders & Float Ownership Breakdown"},
+            {"mnemonic": "AI", "desc": "Autonomous AI Equity Research Analyst Investment Memo"},
             {"mnemonic": "WIRP", "desc": "World Interest Rate Probabilities (FOMC Rate Hike/Cut Probabilities)"},
             {"mnemonic": "WCRS", "desc": "World Currency Ranker (Global FX Performance vs USD)"},
             {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},

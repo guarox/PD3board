@@ -10,11 +10,20 @@ def test_parse_ticker_sector_function_go():
     assert res["function"] == "GP"
 
 def test_parse_standalone_function():
-    for fn in ["WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM"]:
+    for fn in ["WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM", "OMON", "MAPS", "AI", "INSD", "HDS"]:
         res = CommandParser.parse(f"{fn} <GO>")
         assert res["valid"] is True
         assert res["function"] == fn
         assert res["ticker"] is None
+
+def test_parse_aliases():
+    res_heat = CommandParser.parse("HEAT <GO>")
+    assert res_heat["valid"] is True
+    assert res_heat["function"] == "MAPS"
+
+    res_res = CommandParser.parse("RES <GO>")
+    assert res_res["valid"] is True
+    assert res_res["function"] == "AI"
 
 def test_parse_inferred_sector():
     res_crypto = CommandParser.parse("BTCUSDT L2 <GO>")

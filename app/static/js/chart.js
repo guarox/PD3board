@@ -21,7 +21,8 @@ class PriceChart {
       SMA20: false,
       SMA50: false,
       BOLL: false,
-      RSI: false
+      RSI: false,
+      MACD: false
     };
 
     // Interactive state: Crosshair, Tooltip, Pan & Zoom
@@ -190,6 +191,43 @@ class PriceChart {
     return rsi;
   }
 
+  calculateMACD(fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+    if (this.candles.length < 5) return { macd: [], signal: [], hist: [] };
+    const closes = this.candles.map(c => c.close);
+
+    const calcEMA = (data, p) => {
+      const k = 2 / (p + 1);
+      const ema = new Array(data.length).fill(null);
+      let sum = 0;
+      const initial = Math.min(p, data.length);
+      for (let i = 0; i < initial; i++) sum += data[i];
+      let prev = sum / initial;
+      ema[initial - 1] = prev;
+      for (let i = initial; i < data.length; i++) {
+        prev = (data[i] * k) + (prev * (1 - k));
+        ema[i] = prev;
+      }
+      return ema;
+    };
+
+    const fastEMA = calcEMA(closes, Math.min(fastPeriod, closes.length));
+    const slowEMA = calcEMA(closes, Math.min(slowPeriod, closes.length));
+    const macdLine = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (fastEMA[i] !== null && slowEMA[i] !== null) {
+        macdLine.push(fastEMA[i] - slowEMA[i]);
+      } else {
+        macdLine.push(0);
+      }
+    }
+    const signalLine = calcEMA(macdLine, Math.min(signalPeriod, macdLine.length));
+    const hist = [];
+    for (let i = 0; i < closes.length; i++) {
+      hist.push(macdLine[i] - (signalLine[i] !== null ? signalLine[i] : 0));
+    }
+    return { macd: macdLine, signal: signalLine, hist: hist };
+  }
+
   aggregateCandles(rawCandles, interval) {
     if (!rawCandles || rawCandles.length === 0) return [];
     if (interval === '1M') return [...rawCandles];
@@ -289,13 +327,27 @@ class PriceChart {
     const marginBottom = 25;
     const marginTop = 24;
     const plotWidth = this.width - marginRight;
-    const totalPlotHeight = this.height - marginBottom - marginTop;
-
-    // Allocate height if RSI is enabled
+    // Allocate height if RSI or MACD is enabled
     const rsiActive = this.indicators.RSI;
-    const rsiHeight = rsiActive ? Math.max(45, Math.floor(totalPlotHeight * 0.25)) : 0;
-    const pricePlotHeight = rsiActive ? (totalPlotHeight - rsiHeight - 12) : totalPlotHeight;
-    const rsiTop = marginTop + pricePlotHeight + 12;
+    const macdActive = this.indicators.MACD;
+    const subPaneCount = (rsiActive ? 1 : 0) + (macdActive ? 1 : 0);
+    const subPaneHeight = subPaneCount > 0 ? Math.max(40, Math.floor((totalPlotHeight * (subPaneCount === 2 ? 0.36 : 0.22)) / subPaneCount)) : 0;
+    const pricePlotHeight = totalPlotHeight - (subPaneCount * (subPaneHeight + 8));
+
+    let currentSubPaneTop = marginTop + pricePlotHeight + 8;
+    let rsiTop = 0;
+    let rsiHeight = 0;
+    if (rsiActive) {
+      rsiTop = currentSubPaneTop;
+      rsiHeight = subPaneHeight;
+      currentSubPaneTop += subPaneHeight + 8;
+    }
+    let macdTop = 0;
+    let macdHeight = 0;
+    if (macdActive) {
+      macdTop = currentSubPaneTop;
+      macdHeight = subPaneHeight;
+    }
 
     // Calculate High / Low range
     let minPrice = Infinity;
@@ -543,6 +595,95 @@ class PriceChart {
       ctx.font = 'bold 9px monospace';
       ctx.fillStyle = '#ffb000';
       ctx.fillText(`RSI(14): ${latestRsi.toFixed(1)}`, 8, rsiTop + 12);
+    }
+
+    // MACD Sub-Pane
+    if (macdActive && macdHeight > 0) {
+      const macdData = this.calculateMACD(12, 26, 9);
+      const { macd, signal, hist } = macdData;
+
+      // Find max abs amplitude for symmetric scale around 0
+      let maxAmp = 0.001;
+      for (let i = 0; i < this.candles.length; i++) {
+        if (macd[i] !== null && Math.abs(macd[i]) > maxAmp) maxAmp = Math.abs(macd[i]);
+        if (signal[i] !== null && Math.abs(signal[i]) > maxAmp) maxAmp = Math.abs(signal[i]);
+        if (hist[i] !== null && Math.abs(hist[i]) > maxAmp) maxAmp = Math.abs(hist[i]);
+      }
+      maxAmp *= 1.15; // 15% headroom
+
+      const zeroY = macdTop + macdHeight / 2;
+      const macdToY = (v) => zeroY - (v / maxAmp) * (macdHeight / 2);
+
+      // Background & Boundary
+      ctx.fillStyle = '#060606';
+      ctx.fillRect(0, macdTop, plotWidth, macdHeight);
+      ctx.strokeStyle = '#221800';
+      ctx.strokeRect(0, macdTop, plotWidth, macdHeight);
+
+      // Zero Baseline
+      ctx.strokeStyle = 'rgba(153, 106, 0, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(0, zeroY);
+      ctx.lineTo(plotWidth, zeroY);
+      ctx.stroke();
+
+      // Zero Label on Right Margin
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#888';
+      ctx.fillText('0.00', plotWidth + 6, zeroY + 3);
+
+      // Draw Histogram Bars
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset;
+        if (x + candleWidth < 0 || x > plotWidth) continue;
+        const hVal = hist[i] || 0;
+        const barH = (hVal / maxAmp) * (macdHeight / 2);
+        ctx.fillStyle = hVal >= 0 ? 'rgba(0, 255, 102, 0.6)' : 'rgba(255, 51, 68, 0.6)';
+        if (hVal >= 0) {
+          ctx.fillRect(x, zeroY - barH, candleWidth, barH);
+        } else {
+          ctx.fillRect(x, zeroY, candleWidth, -barH);
+        }
+      }
+
+      // Draw MACD Line (Cyan)
+      ctx.strokeStyle = '#00f0ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let first = true;
+      let latestMacd = 0;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (macd[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = macdToY(macd[i]);
+          latestMacd = macd[i];
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+
+      // Draw Signal Line (Amber)
+      ctx.strokeStyle = '#ffb000';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      first = true;
+      let latestSignal = 0;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (signal[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = macdToY(signal[i]);
+          latestSignal = signal[i];
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+
+      // Live Badge
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = '#00f0ff';
+      ctx.fillText(`MACD(12,26): ${latestMacd.toFixed(2)}`, 8, macdTop + 12);
+      ctx.fillStyle = '#ffb000';
+      ctx.fillText(`SIG(9): ${latestSignal.toFixed(2)}`, 140, macdTop + 12);
     }
 
     // Current Price Dashed Reference Line

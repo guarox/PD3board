@@ -473,6 +473,36 @@ class TerminalController {
         data = res.ok ? await res.json() : null;
       }
       this.showFdmModal(data);
+    } else if (fn === 'OMON') {
+      if (!data) {
+        const res = await fetch(`/api/options/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showOmonModal(data);
+    } else if (fn === 'MAPS') {
+      if (!data) {
+        const res = await fetch('/api/heatmap');
+        data = res.ok ? await res.json() : null;
+      }
+      this.showMapsModal(data);
+    } else if (fn === 'AI') {
+      if (!data) {
+        const res = await fetch(`/api/research/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showAiModal(data);
+    } else if (fn === 'INSD') {
+      if (!data) {
+        const res = await fetch(`/api/insiders/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showInsdModal(data);
+    } else if (fn === 'HDS') {
+      if (!data) {
+        const res = await fetch(`/api/holders/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showHdsModal(data);
     } else if (fn === 'HELP') {
       if (!data) {
         const res = await fetch('/api/help');
@@ -1063,10 +1093,420 @@ class TerminalController {
     modal.classList.remove('hidden');
   }
 
+  showOmonModal(omon) {
+    if (!omon) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'OMON';
+    heading.innerText = `${omon.symbol} // OPTIONS MONITOR & BLACK-SCHOLES GREEKS`;
+
+    let rowsHtml = '';
+    omon.chain.forEach(row => {
+      const isAtm = row.is_atm;
+      const isMaxPain = row.is_max_pain;
+      const rowStyle = isAtm ? 'background: rgba(255, 176, 0, 0.12); font-weight: bold;' : (isMaxPain ? 'background: rgba(0, 240, 255, 0.1);' : '');
+      const strikeBadge = isAtm ? ' <span style="color: var(--amber-bright); font-size: 9px;">[ATM]</span>' : (isMaxPain ? ' <span style="color: #00f0ff; font-size: 9px;">[MAX PAIN]</span>' : '');
+
+      rowsHtml += `
+        <tr style="${rowStyle}">
+          <td class="text-right" style="color: #00f0ff;">${row.call_delta}</td>
+          <td class="text-right neu">${row.call_gamma}</td>
+          <td class="text-right neu">${row.call_theta}</td>
+          <td class="text-right neu">${row.call_vega}</td>
+          <td class="text-right" style="color: #00ff66;">${row.call_bid.toFixed(2)}</td>
+          <td class="text-right" style="color: #00ff66;">${row.call_ask.toFixed(2)}</td>
+          <td class="text-right neu">${(row.call_iv * 100).toFixed(1)}%</td>
+          <td class="text-center" style="font-weight: bold; color: var(--amber-bright); background: #1c1c1c; border-left: 1px solid #333; border-right: 1px solid #333;">${row.strike.toFixed(2)}${strikeBadge}</td>
+          <td class="text-right neu">${(row.put_iv * 100).toFixed(1)}%</td>
+          <td class="text-right" style="color: #ff3344;">${row.put_bid.toFixed(2)}</td>
+          <td class="text-right" style="color: #ff3344;">${row.put_ask.toFixed(2)}</td>
+          <td class="text-right neu">${row.put_vega}</td>
+          <td class="text-right neu">${row.put_theta}</td>
+          <td class="text-right neu">${row.put_gamma}</td>
+          <td class="text-right" style="color: #00f0ff;">${row.put_delta}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">UNDERLYING SPOT</div>
+          <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">$${omon.spot_price.toFixed(2)}</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">EXPIRATION (DTE)</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;">${omon.expiration} (${omon.dte} DTE)</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">ATM VOLATILITY (IV)</div>
+          <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${(omon.atm_iv * 100).toFixed(1)}%</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">MAX PAIN STRIKE</div>
+          <div style="font-size: 16px; font-weight: bold; color: #ff00ea;">$${omon.max_pain_strike.toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="modal-table" style="font-size: 11px;">
+          <thead>
+            <tr>
+              <th colspan="7" class="text-center" style="background: rgba(0, 255, 102, 0.1); color: #00ff66;">CALLS (BULLISH)</th>
+              <th class="text-center" style="background: #252525; color: var(--amber-bright);">STRIKE</th>
+              <th colspan="7" class="text-center" style="background: rgba(255, 51, 68, 0.1); color: #ff3344;">PUTS (BEARISH)</th>
+            </tr>
+            <tr>
+              <th class="text-right">DELTA (Δ)</th>
+              <th class="text-right">GAMMA (Γ)</th>
+              <th class="text-right">THETA (Θ)</th>
+              <th class="text-right">VEGA (ν)</th>
+              <th class="text-right">BID</th>
+              <th class="text-right">ASK</th>
+              <th class="text-right">IV</th>
+              <th class="text-center">STRIKE</th>
+              <th class="text-right">IV</th>
+              <th class="text-right">BID</th>
+              <th class="text-right">ASK</th>
+              <th class="text-right">VEGA (ν)</th>
+              <th class="text-right">THETA (Θ)</th>
+              <th class="text-right">GAMMA (Γ)</th>
+              <th class="text-right">DELTA (Δ)</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        BLACK-SCHOLES CONTINUOUS FORMULATION // RISK-FREE RATE: 4.50% // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showMapsModal(mapData) {
+    if (!mapData) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'MAPS';
+    heading.innerText = `S&P 500 MARKET HEATMAP // GICS SECTOR TREEMAP (${mapData.index})`;
+
+    let sectorsHtml = '';
+    mapData.sectors.forEach(sec => {
+      let tickersHtml = '';
+      sec.constituents.forEach(stock => {
+        const isPos = stock.change_pct >= 0;
+        const sign = isPos ? '+' : '';
+        const bg = isPos ? (stock.change_pct > 2 ? 'rgba(0, 200, 80, 0.45)' : 'rgba(0, 160, 60, 0.3)') : (stock.change_pct < -2 ? 'rgba(220, 40, 50, 0.45)' : 'rgba(180, 40, 50, 0.3)');
+        const border = isPos ? '#00aa44' : '#cc2233';
+
+        tickersHtml += `
+          <div class="treemap-card" data-symbol="${stock.symbol}" style="background: ${bg}; border: 1px solid ${border}; border-radius: 2px; padding: 6px 8px; cursor: pointer; flex: 1 1 90px; min-width: 80px; text-align: center; transition: transform 0.1s, box-shadow 0.1s;">
+            <div style="font-weight: bold; font-size: 13px; color: #fff;">${stock.symbol}</div>
+            <div style="font-size: 11px; font-weight: bold; color: ${isPos ? '#00ff66' : '#ff5566'};">${sign}${stock.change_pct.toFixed(2)}%</div>
+            <div style="font-size: 9px; color: rgba(255,255,255,0.7);">$${stock.price.toFixed(2)}</div>
+            <div style="font-size: 8px; color: #aaa;">$${stock.mkt_cap_b}B</div>
+          </div>
+        `;
+      });
+
+      sectorsHtml += `
+        <div style="background: #111; border: 1px solid #282828; padding: 10px; margin-bottom: 12px; border-radius: 3px;">
+          <div style="font-size: 11px; font-weight: bold; color: var(--amber-bright); margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 4px;">
+            ${sec.sector} (${sec.constituents.length} STOCKS)
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+            ${tickersHtml}
+          </div>
+        </div>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 12px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">MARKET PERFORMANCE</div>
+          <div style="font-size: 15px; font-weight: bold; color: #fff;">${mapData.total_symbols} KEY CONSTITUENTS</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">ADVANCERS</div>
+          <div style="font-size: 15px; font-weight: bold; color: #00ff66;">${mapData.advancers} TICKERS</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">DECLINERS</div>
+          <div style="font-size: 15px; font-weight: bold; color: #ff3344;">${mapData.decliners} TICKERS</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">ACTION</div>
+          <div style="font-size: 11px; color: var(--amber-bright); margin-top: 2px;">CLICK ANY TILE TO LOAD WORKSTATION CHART &amp; DEPTH</div>
+        </div>
+      </div>
+
+      <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
+        ${sectorsHtml}
+      </div>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+
+    // Wire clicks on treemap tiles to load ticker
+    body.querySelectorAll('.treemap-card').forEach(tile => {
+      tile.addEventListener('click', () => {
+        const sym = tile.dataset.symbol;
+        if (sym) {
+          this.closeModal();
+          this.executeCommand(`${sym} GP <GO>`);
+        }
+      });
+    });
+
+    modal.classList.remove('hidden');
+  }
+
+  showAiModal(ai) {
+    if (!ai) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'AI';
+    heading.innerText = `${ai.symbol} // AUTONOMOUS EQUITY RESEARCH ANALYST MEMO`;
+
+    let moatsHtml = '';
+    ai.competitive_moat.forEach(m => {
+      moatsHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00f0ff;">${m.split(':')[0]}:</strong>${m.split(':').slice(1).join(':')}</li>`;
+    });
+
+    let catHtml = '';
+    ai.growth_catalysts.forEach(c => {
+      catHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00ff66;">${c.split(':')[0]}:</strong>${c.split(':').slice(1).join(':')}</li>`;
+    });
+
+    let riskHtml = '';
+    ai.downside_risks.forEach(r => {
+      riskHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #ff3344;">${r.split(':')[0]}:</strong>${r.split(':').slice(1).join(':')}</li>`;
+    });
+
+    const isBuy = ai.rating.includes('BUY') || ai.rating.includes('OUTPERFORM');
+    const ratingColor = isBuy ? '#00ff66' : '#ffb000';
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 12px; border: 1px solid #282828;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">ANALYST RATING</div>
+          <div style="font-size: 18px; font-weight: bold; color: ${ratingColor};">${ai.rating}</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">PRICE TARGET (12M)</div>
+          <div style="font-size: 18px; font-weight: bold; color: var(--amber-bright);">$${ai.target_price.toFixed(2)}</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">IMPLIED UPSIDE</div>
+          <div style="font-size: 18px; font-weight: bold; color: #00ff66;">+${ai.upside_pct.toFixed(2)}%</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">SOURCE</div>
+          <div style="font-size: 12px; color: #fff; margin-top: 3px;">${ai.analyst}</div>
+        </div>
+      </div>
+
+      <div style="max-height: 480px; overflow-y: auto; padding-right: 6px; font-size: 12px; line-height: 1.5;">
+        <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-left: 3px solid var(--amber-bright);">
+          <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 6px; font-size: 12px;">EXECUTIVE INVESTMENT THESIS</div>
+          <div style="color: #eee;">${ai.investment_thesis}</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+          <div style="background: #111; border: 1px solid #252525; padding: 12px; border-top: 2px solid #00f0ff;">
+            <div style="font-weight: bold; color: #00f0ff; margin-bottom: 8px;">COMPETITIVE MOAT &amp; DEFENSIVE ADVANTAGES</div>
+            <ul style="padding-left: 16px; margin: 0;">${moatsHtml}</ul>
+          </div>
+          <div style="background: #111; border: 1px solid #252525; padding: 12px; border-top: 2px solid #00ff66;">
+            <div style="font-weight: bold; color: #00ff66; margin-bottom: 8px;">HIGH-CONVICTION GROWTH CATALYSTS</div>
+            <ul style="padding-left: 16px; margin: 0;">${catHtml}</ul>
+          </div>
+        </div>
+
+        <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-top: 2px solid #ff3344;">
+          <div style="font-weight: bold; color: #ff3344; margin-bottom: 8px;">DOWNSIDE SCENARIO &amp; KEY RISK FACTORS</div>
+          <ul style="padding-left: 16px; margin: 0;">${riskHtml}</ul>
+        </div>
+
+        <div style="background: #111; border: 1px solid #252525; padding: 12px;">
+          <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 8px;">VALUATION MULTIPLES &amp; MULTI-YEAR VERDICT</div>
+          <div style="display: flex; gap: 15px; margin-bottom: 8px; flex-wrap: wrap;">
+            <div><span style="color: #888;">FWD P/E:</span> <strong style="color: #fff;">${ai.valuation_assessment.fwd_pe}</strong></div>
+            <div><span style="color: #888;">EV/EBITDA:</span> <strong style="color: #fff;">${ai.valuation_assessment.ev_ebitda}</strong></div>
+            <div><span style="color: #888;">FCF YIELD:</span> <strong style="color: #00ff66;">${ai.valuation_assessment.free_cash_flow_yield}</strong></div>
+            <div><span style="color: #888;">DIV YIELD:</span> <strong style="color: var(--amber-bright);">${ai.valuation_assessment.dividend_yield}</strong></div>
+          </div>
+          <div style="color: #ffcc00; font-weight: bold; border-top: 1px solid #222; padding-top: 6px;">
+            VERDICT: ${ai.valuation_assessment.verdict}
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showInsdModal(insd) {
+    if (!insd) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'INSD';
+    heading.innerText = `${insd.symbol} // SEC FORM 4 INSIDER TRANSACTIONS`;
+
+    const isBuySentiment = insd.sentiment.includes('BUY');
+    const sentColor = isBuySentiment ? '#00ff66' : '#ff3344';
+
+    let rowsHtml = '';
+    insd.transactions.forEach(t => {
+      const isSale = t.type.includes('Sale');
+      const typeColor = isSale ? '#ff3344' : '#00ff66';
+      rowsHtml += `
+        <tr>
+          <td>${t.date}</td>
+          <td><strong style="color: #fff;">${t.name}</strong></td>
+          <td class="neu">${t.title}</td>
+          <td style="color: ${typeColor}; font-weight: bold;">${t.type}</td>
+          <td class="text-right" style="color: ${typeColor};">${isSale ? '-' : '+'}${t.shares.toLocaleString()}</td>
+          <td class="text-right">$${t.price.toFixed(2)}</td>
+          <td class="text-right" style="font-weight: bold; color: ${typeColor};">$${t.value.toLocaleString()}</td>
+          <td class="text-right neu">${t.shares_owned.toLocaleString()}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">INSIDER SENTIMENT</div>
+          <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${insd.sentiment}</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">NET SHARES FLOW</div>
+          <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${insd.net_shares_flow.toLocaleString()} SHARES</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">PERIOD</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;">${insd.period}</div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>DATE</th>
+              <th>INSIDER NAME</th>
+              <th>CORPORATE TITLE</th>
+              <th>TRANSACTION TYPE</th>
+              <th class="text-right">SHARES</th>
+              <th class="text-right">PRICE</th>
+              <th class="text-right">NET VALUE</th>
+              <th class="text-right">POST SHARES</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        DATA SOURCE: US SEC EDGAR ELECTRONIC FORM 4 SYSTEM // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showHdsModal(hds) {
+    if (!hds) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'HDS';
+    heading.innerText = `${hds.symbol} // 13F INSTITUTIONAL OWNERSHIP BREAKDOWN`;
+
+    let rowsHtml = '';
+    hds.holders.forEach(h => {
+      const isPos = h.change_shares >= 0;
+      const chgColor = isPos ? '#00ff66' : '#ff3344';
+      const sign = isPos ? '+' : '';
+      rowsHtml += `
+        <tr>
+          <td class="text-center" style="color: var(--amber-bright); font-weight: bold;">${h.rank}</td>
+          <td><strong style="color: #fff;">${h.name}</strong></td>
+          <td class="text-right">${h.shares.toLocaleString()}</td>
+          <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">$${h.value_b.toFixed(2)}B</td>
+          <td class="text-right" style="color: #00f0ff; font-weight: bold;">${h.pct_float.toFixed(2)}%</td>
+          <td class="text-right" style="color: ${chgColor};">${sign}${h.change_shares.toLocaleString()}</td>
+          <td class="text-right neu">${h.date}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">TOP INSTITUTIONAL CONCENTRATION</div>
+          <div style="font-size: 16px; font-weight: bold; color: #00f0ff;">${hds.top_holders_ownership_pct}% OF FLOAT</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">REPORTED HOLDERS</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;">TOP ${hds.top_holders_count} ASSET MANAGERS</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">REGULATORY FILING SOURCE</div>
+          <div style="font-size: 14px; font-weight: bold; color: var(--amber-bright);">${hds.source}</div>
+        </div>
+      </div>
+
+      <div style="overflow-x: auto;">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th class="text-center">RANK</th>
+              <th>INSTITUTIONAL MANAGER</th>
+              <th class="text-right">SHARES HELD</th>
+              <th class="text-right">MARKET VALUE ($B)</th>
+              <th class="text-right">% FLOAT</th>
+              <th class="text-right">Q/Q NET CHANGE</th>
+              <th class="text-right">REPORT DATE</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </div>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        DATA SOURCE: US SEC EDGAR FORM 13F-HR // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
   closeModal() {
     const modal = document.getElementById('terminalModal');
     if (modal) modal.classList.add('hidden');
-    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM'];
+    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM', 'OMON', 'MAPS', 'AI', 'INSD', 'HDS'];
     if (modalFunctions.includes(this.currentFunction)) {
       this.setFunction('GP');
     }
