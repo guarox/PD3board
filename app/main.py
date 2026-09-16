@@ -229,14 +229,27 @@ async def get_orderbook(symbol: str):
 @app.get("/api/ticks/{symbol}")
 async def get_ticks(symbol: str):
     sym = symbol.upper()
-    tb = tick_buffers.get(sym) or tick_buffers.get(Config.DEFAULT_CRYPTO)
-    if tb:
-        return {
-            "symbol": sym,
-            "candles": tb.get_candles(),
-            "ticks": tb.get_recent_ticks()
-        }
-    return {"symbol": sym, "candles": [], "ticks": []}
+    if sym not in tick_buffers:
+        tb = TickBuffer(sym)
+        eq_data = equities_feed.equities.get(sym)
+        base = eq_data["price"] if eq_data else 150.0
+        now_ts = time.time()
+        for i in range(60):
+            t_time = now_ts - (60 - i) * 60
+            base += (hash(f"{sym}_{i}") % 20 - 10) * 0.1
+            tb.add_tick(
+                price=round(base, 2),
+                size=100.0,
+                side="buy" if i % 2 == 0 else "sell",
+                timestamp=t_time
+            )
+        tick_buffers[sym] = tb
+    tb = tick_buffers[sym]
+    return {
+        "symbol": sym,
+        "candles": tb.get_candles(),
+        "ticks": tb.get_recent_ticks()
+    }
 
 @app.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):

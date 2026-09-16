@@ -129,6 +129,16 @@ class TerminalController {
       this.renderWEI(msg.data);
     } else if (msg.type === 'equities_update') {
       this.updateEquitiesTicks(msg.data);
+      if (Array.isArray(msg.data)) {
+        msg.data.forEach(t => {
+          if (t.symbol === this.currentTicker) {
+            this.updateHeaderPrice(t.price, t.change >= 0 ? 'buy' : 'sell');
+            if (this.priceChart) {
+              this.priceChart.updateLiveTick(t.price, 100);
+            }
+          }
+        });
+      }
     } else if (msg.type === 'news') {
       this.renderNews(msg.data);
     } else if (msg.type === 'yield_curve') {
