@@ -2,7 +2,7 @@ import re
 from typing import Dict, Any, Optional
 
 SECTORS = {"EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"}
-FUNCTIONS = {"GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP"}
+FUNCTIONS = {"GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM"}
 
 class CommandParser:
     """

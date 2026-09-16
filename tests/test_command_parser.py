@@ -10,7 +10,7 @@ def test_parse_ticker_sector_function_go():
     assert res["function"] == "GP"
 
 def test_parse_standalone_function():
-    for fn in ["WEI", "TOP", "YCRV", "ECO", "HELP"]:
+    for fn in ["WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM"]:
         res = CommandParser.parse(f"{fn} <GO>")
         assert res["valid"] is True
         assert res["function"] == fn

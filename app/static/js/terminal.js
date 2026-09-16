@@ -77,6 +77,10 @@ class TerminalController {
     this.clockMode = 'EST';
     this.sound = new SoundEngine();
 
+    // Command History Memory
+    this.cmdHistory = [];
+    this.historyIdx = -1;
+
     this.priceChart = null;
     this.orderBookUI = null;
 
@@ -102,11 +106,38 @@ class TerminalController {
       });
     });
 
-    // Handle Enter on command input
+    // Technical Indicator Selector Buttons
+    document.querySelectorAll('.btn-indicator').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ind = btn.dataset.indicator;
+        if (this.priceChart) {
+          const active = this.priceChart.toggleIndicator(ind);
+          btn.classList.toggle('active', active);
+        }
+        this.sound.playKeyClick();
+      });
+    });
+
+    // Handle Enter and Up/Down Command Recall on command input
     if (this.cmdInput) {
       this.cmdInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           this.executeCommand(this.cmdInput.value);
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (this.cmdHistory.length > 0 && this.historyIdx < this.cmdHistory.length - 1) {
+            this.historyIdx++;
+            this.cmdInput.value = this.cmdHistory[this.cmdHistory.length - 1 - this.historyIdx];
+          }
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          if (this.historyIdx > 0) {
+            this.historyIdx--;
+            this.cmdInput.value = this.cmdHistory[this.cmdHistory.length - 1 - this.historyIdx];
+          } else if (this.historyIdx === 0) {
+            this.historyIdx = -1;
+            this.cmdInput.value = '';
+          }
         } else {
           this.sound.playKeyClick();
         }
@@ -342,11 +373,20 @@ class TerminalController {
   async executeCommand(rawCommand) {
     if (!rawCommand || !rawCommand.trim()) return;
     this.sound.playGoSound();
+
+    const trimmed = rawCommand.trim();
+    if (trimmed) {
+      if (this.cmdHistory.length === 0 || this.cmdHistory[this.cmdHistory.length - 1] !== trimmed) {
+        this.cmdHistory.push(trimmed);
+      }
+      this.historyIdx = -1;
+    }
+
     try {
       const res = await fetch('/api/command', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: rawCommand })
+        body: JSON.stringify({ command: trimmed })
       });
       const resp = await res.json();
       if (resp.success) {
@@ -391,6 +431,48 @@ class TerminalController {
         data = res.ok ? await res.json() : null;
       }
       this.showDesModal(data);
+    } else if (fn === 'ANR') {
+      if (!data) {
+        const res = await fetch(`/api/anr/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showAnrModal(data);
+    } else if (fn === 'FA') {
+      if (!data) {
+        const res = await fetch(`/api/fa/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showFaModal(data);
+    } else if (fn === 'RV') {
+      if (!data) {
+        const res = await fetch(`/api/rv/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showRvModal(data);
+    } else if (fn === 'EE') {
+      if (!data) {
+        const res = await fetch(`/api/ee/${this.currentTicker}`);
+        data = res.ok ? await res.json() : null;
+      }
+      this.showEeModal(data);
+    } else if (fn === 'WIRP') {
+      if (!data) {
+        const res = await fetch('/api/wirp');
+        data = res.ok ? await res.json() : null;
+      }
+      this.showWirpModal(data);
+    } else if (fn === 'WCRS') {
+      if (!data) {
+        const res = await fetch('/api/wcrs');
+        data = res.ok ? await res.json() : null;
+      }
+      this.showWcrsModal(data);
+    } else if (fn === 'FDM') {
+      if (!data) {
+        const res = await fetch('/api/fdm');
+        data = res.ok ? await res.json() : null;
+      }
+      this.showFdmModal(data);
     } else if (fn === 'HELP') {
       if (!data) {
         const res = await fetch('/api/help');
@@ -467,7 +549,421 @@ class TerminalController {
           <div class="des-row"><span class="des-label">SECTOR CLASSIFICATION</span><span class="des-val">${des.sector}</span></div>
         </div>
       </div>
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted);">
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showAnrModal(anr) {
+    if (!anr) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'ANR';
+    heading.innerText = `${anr.symbol} - ANALYST RECOMMENDATIONS & TARGETS`;
+
+    let brokersHtml = '';
+    anr.brokers.forEach(b => {
+      const ratingCls = b.rating.includes('BUY') || b.rating.includes('OVERWEIGHT') ? 'pos' : (b.rating.includes('UNDER') || b.rating.includes('SELL') ? 'neg' : 'neu');
+      brokersHtml += `
+        <tr>
+          <td><strong>${b.firm}</strong></td>
+          <td>${b.analyst}</td>
+          <td class="${ratingCls}"><strong>${b.rating}</strong></td>
+          <td class="text-right"><strong>$${b.target.toFixed(2)}</strong></td>
+          <td class="text-right neu">${b.date}</td>
+        </tr>
+      `;
+    });
+
+    const upsideCls = anr.upside_pct >= 0 ? 'pos' : 'neg';
+    const sign = anr.upside_pct >= 0 ? '+' : '';
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div style="flex: 1;">
+          <div style="font-size: 11px; color: var(--text-muted);">CONSENSUS RATING</div>
+          <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${anr.consensus} (${anr.consensus_score} / 5.0)</div>
+          <div style="font-size: 11px; margin-top: 4px;">
+            <span class="pos">${anr.buys} BUYS</span> &bull; 
+            <span class="neu">${anr.holds} HOLDS</span> &bull; 
+            <span class="neg">${anr.sells} SELLS</span> (${anr.total_analysts} TOTAL)
+          </div>
+        </div>
+        <div style="flex: 1; border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">12M PRICE TARGET</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;">$${anr.target_price.toFixed(2)} <span class="${upsideCls}" style="font-size: 13px;">(${sign}${anr.upside_pct}%)</span></div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+            RANGE: $${anr.target_low.toFixed(2)} - $${anr.target_high.toFixed(2)}
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 8px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">WALL STREET BROKER COVERAGE</div>
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>BROKER FIRM</th>
+            <th>LEAD ANALYST</th>
+            <th>RECOMMENDATION</th>
+            <th class="text-right">PRICE TARGET</th>
+            <th class="text-right">DATE</th>
+          </tr>
+        </thead>
+        <tbody>${brokersHtml}</tbody>
+      </table>
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showFaModal(fa) {
+    if (!fa) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'FA';
+    heading.innerText = `${fa.symbol} - FINANCIAL ANALYSIS (5-YEAR HISTORICAL)`;
+
+    const yearsHead = fa.years.map(y => `<th class="text-right">${y}</th>`).join('');
+
+    const renderRows = (items) => {
+      return items.map(item => `
+        <tr>
+          <td>${item.metric}</td>
+          ${item.vals.map(v => `<td class="text-right"><strong>${v}</strong></td>`).join('')}
+        </tr>
+      `).join('');
+    };
+
+    body.innerHTML = `
+      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">INCOME STATEMENT</div>
+      <table class="modal-table" style="margin-bottom: 12px;">
+        <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
+        <tbody>${renderRows(fa.income_statement)}</tbody>
+      </table>
+
+      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">BALANCE SHEET &amp; LIQUIDITY</div>
+      <table class="modal-table" style="margin-bottom: 12px;">
+        <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
+        <tbody>${renderRows(fa.balance_sheet)}</tbody>
+      </table>
+
+      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">CASH FLOW STATEMENT</div>
+      <table class="modal-table">
+        <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
+        <tbody>${renderRows(fa.cash_flow)}</tbody>
+      </table>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showRvModal(rv) {
+    if (!rv) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'RV';
+    heading.innerText = `${rv.symbol} - RELATIVE VALUATION & PEER COMP MATRIX`;
+
+    let rowsHtml = '';
+    rv.peers.forEach(p => {
+      const isTarget = p.symbol === rv.symbol;
+      rowsHtml += `
+        <tr style="${isTarget ? 'background: #221800; font-weight: bold;' : ''}">
+          <td><strong style="color: ${isTarget ? 'var(--amber-bright)' : '#fff'};">${p.symbol}</strong></td>
+          <td>${p.name}</td>
+          <td class="text-right">$${p.price.toFixed(2)}</td>
+          <td class="text-right">${p.pe}</td>
+          <td class="text-right">${p.fwd_pe}</td>
+          <td class="text-right">${p.ev_ebitda}</td>
+          <td class="text-right">${p.ps}</td>
+          <td class="text-right">${p.op_margin}</td>
+          <td class="text-right">${p.roe}</td>
+          <td class="text-right">${p.div_yield}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="margin-bottom: 10px; color: var(--text-muted); font-size: 11px;">
+        INDUSTRY GROUP: <strong style="color: var(--amber-bright);">${rv.industry}</strong>
+      </div>
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>TICKER</th>
+            <th>SECURITY NAME</th>
+            <th class="text-right">PRICE</th>
+            <th class="text-right">P/E</th>
+            <th class="text-right">FWD P/E</th>
+            <th class="text-right">EV/EBITDA</th>
+            <th class="text-right">P/S</th>
+            <th class="text-right">OP MARG</th>
+            <th class="text-right">ROE</th>
+            <th class="text-right">DIV YLD</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showEeModal(ee) {
+    if (!ee) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'EE';
+    heading.innerText = `${ee.symbol} - EARNINGS ESTIMATES & SURPRISES`;
+
+    let histHtml = '';
+    ee.quarterly_history.forEach(q => {
+      const cls = q.surprise_pct >= 0 ? 'pos' : 'neg';
+      const sign = q.surprise_pct >= 0 ? '+' : '';
+      histHtml += `
+        <tr>
+          <td><strong>${q.quarter}</strong></td>
+          <td class="text-right">$${q.reported_eps.toFixed(2)}</td>
+          <td class="text-right neu">$${q.consensus_eps.toFixed(2)}</td>
+          <td class="text-right ${cls}"><strong>${sign}${q.surprise_pct.toFixed(2)}%</strong></td>
+          <td class="text-right">$${q.revenue_reported}</td>
+          <td class="text-right ${cls}">${sign}${q.rev_surprise_pct.toFixed(2)}%</td>
+        </tr>
+      `;
+    });
+
+    let fwdHtml = '';
+    ee.forward_estimates.forEach(f => {
+      fwdHtml += `
+        <tr>
+          <td><strong>${f.quarter}</strong></td>
+          <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">$${f.consensus_eps.toFixed(2)}</td>
+          <td class="text-right neu">$${f.low_eps.toFixed(2)}</td>
+          <td class="text-right neu">$${f.high_eps.toFixed(2)}</td>
+          <td class="text-right">$${f.est_revenue}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">QUARTERLY EPS &amp; REVENUE SURPRISES</div>
+      <table class="modal-table" style="margin-bottom: 14px;">
+        <thead>
+          <tr>
+            <th>QUARTER</th>
+            <th class="text-right">REPORTED EPS</th>
+            <th class="text-right">CONSENSUS</th>
+            <th class="text-right">EPS SURPRISE</th>
+            <th class="text-right">REVENUE</th>
+            <th class="text-right">REV SURPRISE</th>
+          </tr>
+        </thead>
+        <tbody>${histHtml}</tbody>
+      </table>
+
+      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">FORWARD CONSENSUS GUIDANCE</div>
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>QUARTER</th>
+            <th class="text-right">CONSENSUS EPS</th>
+            <th class="text-right">LOW ESTIMATE</th>
+            <th class="text-right">HIGH ESTIMATE</th>
+            <th class="text-right">EST. REVENUE</th>
+          </tr>
+        </thead>
+        <tbody>${fwdHtml}</tbody>
+      </table>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showWirpModal(wirp) {
+    if (!wirp) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'WIRP';
+    heading.innerText = 'WORLD INTEREST RATE PROBABILITIES - FOMC RATE MONITOR';
+
+    let meetHtml = '';
+    wirp.meetings.forEach(m => {
+      meetHtml += `
+        <tr>
+          <td><strong>${m.date}</strong></td>
+          <td class="text-right">${m.days_forward}d</td>
+          <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${m.implied_rate}</td>
+          <td class="text-right pos">${m.prob_cut_25bp}%</td>
+          <td class="text-right pos">${m.prob_cut_50bp}%</td>
+          <td class="text-right neu">${m.prob_hold}%</td>
+          <td class="text-right" style="color: #00e5ff;">${m.bias}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div>
+          <div style="font-size: 11px; color: var(--text-muted);">CURRENT TARGET RATE</div>
+          <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${wirp.current_target_rate}</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">EFFECTIVE FED FUNDS (EFFR)</div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;">${wirp.effective_fed_funds_rate}</div>
+        </div>
+        <div style="border-left: 1px solid #282828; padding-left: 15px;">
+          <div style="font-size: 11px; color: var(--text-muted);">TERMINAL RATE PROJECTION</div>
+          <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${wirp.terminal_rate}</div>
+        </div>
+      </div>
+
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>MEETING DATE</th>
+            <th class="text-right">DAYS</th>
+            <th class="text-right">IMPLIED RATE</th>
+            <th class="text-right">% 25BP CUT</th>
+            <th class="text-right">% 50BP CUT</th>
+            <th class="text-right">% HOLD</th>
+            <th class="text-right">MARKET BIAS</th>
+          </tr>
+        </thead>
+        <tbody>${meetHtml}</tbody>
+      </table>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showWcrsModal(wcrs) {
+    if (!wcrs) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'WCRS';
+    heading.innerText = 'WORLD CURRENCY RANKER - GLOBAL FX PERFORMANCE VS USD';
+
+    const currencies = wcrs.currencies || (Array.isArray(wcrs) ? wcrs : []);
+    let rowsHtml = '';
+    currencies.forEach((c, idx) => {
+      const cls = c.change_pct >= 0 ? 'pos' : 'neg';
+      const sign = c.change_pct >= 0 ? '+' : '';
+      rowsHtml += `
+        <tr>
+          <td><strong>#${idx + 1}</strong></td>
+          <td><strong style="color: var(--amber-bright);">${c.code}</strong></td>
+          <td>${c.name}</td>
+          <td class="text-right"><strong>${c.spot.toFixed(4)}</strong></td>
+          <td class="text-right ${cls}">${sign}${c.change.toFixed(4)}</td>
+          <td class="text-right ${cls}"><strong>${sign}${c.change_pct.toFixed(2)}%</strong></td>
+          <td class="text-right neu">${c.range_52w}</td>
+          <td class="text-right" style="color: #00e5ff;">${c.bias}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>RANK</th>
+            <th>CURRENCY</th>
+            <th>NAME</th>
+            <th class="text-right">SPOT RATE</th>
+            <th class="text-right">NET CHANGE</th>
+            <th class="text-right">% CHANGE</th>
+            <th class="text-right">52-WEEK RANGE</th>
+            <th class="text-right">MARKET BIAS</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
+  showFdmModal(fdm) {
+    if (!fdm) return;
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+
+    badge.innerText = 'FDM';
+    heading.innerText = 'GLOBAL COMMODITIES & FUTURES MONITOR';
+
+    const commodities = fdm.commodities || (Array.isArray(fdm) ? fdm : []);
+    let rowsHtml = '';
+    commodities.forEach(c => {
+      const cls = c.change_pct >= 0 ? 'pos' : 'neg';
+      const sign = c.change_pct >= 0 ? '+' : '';
+      rowsHtml += `
+        <tr>
+          <td><strong style="color: var(--amber-bright);">${c.symbol}</strong></td>
+          <td>${c.name}</td>
+          <td><span class="badge" style="font-size: 9px;">${c.category}</span></td>
+          <td class="text-right"><strong>${c.price.toFixed(2)}</strong></td>
+          <td class="text-right ${cls}">${sign}${c.change.toFixed(2)}</td>
+          <td class="text-right ${cls}"><strong>${sign}${c.change_pct.toFixed(2)}%</strong></td>
+          <td class="text-right neu">${c.unit}</td>
+        </tr>
+      `;
+    });
+
+    body.innerHTML = `
+      <table class="modal-table">
+        <thead>
+          <tr>
+            <th>SYMBOL</th>
+            <th>COMMODITY CONTRACT</th>
+            <th>CATEGORY</th>
+            <th class="text-right">PRICE</th>
+            <th class="text-right">CHANGE</th>
+            <th class="text-right">% CHANGE</th>
+            <th class="text-right">QUOTATION UNIT</th>
+          </tr>
+        </thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
         PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
       </div>
     `;
@@ -502,6 +998,7 @@ class TerminalController {
         <thead><tr><th>SHORTCUT / KEY</th><th>WORKSTATION ACTION</th></tr></thead>
         <tbody>
           <tr><td><strong>/</strong></td><td>Focus Bloomberg command line prompt immediately</td></tr>
+          <tr><td><strong>Up / Down</strong></td><td>Recall previous / next executed commands from history</td></tr>
           <tr><td><strong>&lt;ESC&gt;</strong></td><td>Clear input buffer or dismiss current modal dialog</td></tr>
           <tr><td><strong>&lt;GO&gt; / Enter</strong></td><td>Execute entered mnemonic command</td></tr>
           <tr><td><strong>&lt;CNCL&gt;</strong></td><td>Cancel entered command line</td></tr>
@@ -569,7 +1066,8 @@ class TerminalController {
   closeModal() {
     const modal = document.getElementById('terminalModal');
     if (modal) modal.classList.add('hidden');
-    if (this.currentFunction === 'DES' || this.currentFunction === 'HELP' || this.currentFunction === 'ECO') {
+    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM'];
+    if (modalFunctions.includes(this.currentFunction)) {
       this.setFunction('GP');
     }
   }

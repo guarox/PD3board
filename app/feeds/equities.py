@@ -296,3 +296,241 @@ class EquitiesFeed:
             "currency": "USD"
         }
 
+    def get_analyst_recommendations(self, symbol: str) -> Dict[str, Any]:
+        """
+        Analyst Recommendations (ANR) Wall Street consensus breakdown.
+        """
+        sym = symbol.upper()
+        price = self.get_security_price(sym)
+
+        # Profiles
+        anr_profiles = {
+            "MCD": {
+                "consensus": "MODERATE BUY",
+                "consensus_score": 4.25, # out of 5
+                "target_price": 332.00,
+                "target_high": 360.00,
+                "target_low": 295.00,
+                "buys": 26, "holds": 11, "sells": 2, "total": 39,
+                "brokers": [
+                    {"firm": "GOLDMAN SACHS", "analyst": "Katherine Fogertey", "rating": "BUY", "target": 340.00, "date": "2026-09-10"},
+                    {"firm": "MORGAN STANLEY", "analyst": "John Glass", "rating": "OVERWEIGHT", "target": 335.00, "date": "2026-09-08"},
+                    {"firm": "JPMORGAN", "analyst": "John Ivankoe", "rating": "OVERWEIGHT", "target": 330.00, "date": "2026-09-02"},
+                    {"firm": "CITIGROUP", "analyst": "Jon Tower", "rating": "NEUTRAL", "target": 310.00, "date": "2026-08-28"},
+                    {"firm": "BANK OF AMERICA", "analyst": "Sara Senatore", "rating": "BUY", "target": 345.00, "date": "2026-08-15"}
+                ]
+            },
+            "NVDA": {
+                "consensus": "STRONG BUY",
+                "consensus_score": 4.82,
+                "target_price": 145.00,
+                "target_high": 175.00,
+                "target_low": 120.00,
+                "buys": 58, "holds": 4, "sells": 1, "total": 63,
+                "brokers": [
+                    {"firm": "GOLDMAN SACHS", "analyst": "Toshiya Hari", "rating": "CONVICTION BUY", "target": 150.00, "date": "2026-09-12"},
+                    {"firm": "MORGAN STANLEY", "analyst": "Joseph Moore", "rating": "OVERWEIGHT", "target": 144.00, "date": "2026-09-09"},
+                    {"firm": "BERNSTEIN", "analyst": "Stacy Rasgon", "rating": "OUTPERFORM", "target": 155.00, "date": "2026-09-05"},
+                    {"firm": "JPMORGAN", "analyst": "Harlan Sur", "rating": "OVERWEIGHT", "target": 140.00, "date": "2026-08-30"}
+                ]
+            },
+            "AAPL": {
+                "consensus": "BUY",
+                "consensus_score": 4.15,
+                "target_price": 255.00,
+                "target_high": 275.00,
+                "target_low": 210.00,
+                "buys": 34, "holds": 12, "sells": 4, "total": 50,
+                "brokers": [
+                    {"firm": "MORGAN STANLEY", "analyst": "Erik Woodring", "rating": "OVERWEIGHT", "target": 273.00, "date": "2026-09-11"},
+                    {"firm": "BANK OF AMERICA", "analyst": "Wamsi Mohan", "rating": "BUY", "target": 256.00, "date": "2026-09-04"},
+                    {"firm": "BARCLAYS", "analyst": "Tim Long", "rating": "UNDERWEIGHT", "target": 210.00, "date": "2026-08-25"}
+                ]
+            }
+        }
+
+        profile = anr_profiles.get(sym, {
+            "consensus": "MODERATE BUY",
+            "consensus_score": 3.90,
+            "target_price": round(price * 1.15, 2),
+            "target_high": round(price * 1.30, 2),
+            "target_low": round(price * 0.95, 2),
+            "buys": 18, "holds": 8, "sells": 2, "total": 28,
+            "brokers": [
+                {"firm": "WALL STREET CONSENSUS", "analyst": "Institutional Research", "rating": "BUY", "target": round(price * 1.15, 2), "date": "2026-09-01"},
+                {"firm": "GLOBAL SECURITIES", "analyst": "Equity Desk", "rating": "HOLD", "target": round(price * 1.05, 2), "date": "2026-08-20"}
+            ]
+        })
+
+        upside = round(((profile["target_price"] - price) / price) * 100, 2)
+        return {
+            "symbol": sym,
+            "price": price,
+            "consensus": profile["consensus"],
+            "consensus_score": profile["consensus_score"],
+            "target_price": profile["target_price"],
+            "target_high": profile["target_high"],
+            "target_low": profile["target_low"],
+            "upside_pct": upside,
+            "buys": profile["buys"],
+            "holds": profile["holds"],
+            "sells": profile["sells"],
+            "total_analysts": profile["total"],
+            "brokers": profile["brokers"]
+        }
+
+    def get_financial_analysis(self, symbol: str) -> Dict[str, Any]:
+        """
+        Financial Analysis (FA) 5-year multi-period historical statements.
+        """
+        sym = symbol.upper()
+        years = ["2022", "2023", "2024", "2025", "2026E"]
+
+        fa_data = {
+            "MCD": {
+                "income_statement": [
+                    {"metric": "Revenue / Turnover", "vals": ["23.18B", "25.49B", "26.85B", "28.10B", "29.45B"]},
+                    {"metric": "Gross Profit", "vals": ["13.21B", "14.56B", "15.30B", "16.12B", "16.90B"]},
+                    {"metric": "Operating Income (EBIT)", "vals": ["10.37B", "11.64B", "12.18B", "12.85B", "13.50B"]},
+                    {"metric": "EBITDA", "vals": ["12.15B", "13.48B", "14.10B", "14.90B", "15.65B"]},
+                    {"metric": "Net Income", "vals": ["6.18B", "8.47B", "8.82B", "9.25B", "9.80B"]},
+                    {"metric": "Diluted EPS (USD)", "vals": ["8.33", "11.56", "12.15", "12.80", "13.62"]}
+                ],
+                "balance_sheet": [
+                    {"metric": "Cash & Short Term Inv.", "vals": ["2.58B", "4.57B", "3.20B", "3.85B", "4.10B"]},
+                    {"metric": "Property, Plant & Equip.", "vals": ["24.85B", "26.12B", "27.40B", "28.50B", "29.80B"]},
+                    {"metric": "Total Assets", "vals": ["50.44B", "56.15B", "58.20B", "60.40B", "62.80B"]},
+                    {"metric": "Total Long Term Debt", "vals": ["35.90B", "37.20B", "38.10B", "38.80B", "39.20B"]},
+                    {"metric": "Total Liabilities", "vals": ["56.44B", "60.85B", "62.50B", "64.10B", "65.50B"]},
+                    {"metric": "Total Equity (Deficit)", "vals": ["-6.00B", "-4.70B", "-4.30B", "-3.70B", "-2.70B"]}
+                ],
+                "cash_flow": [
+                    {"metric": "Cash from Operations", "vals": ["7.39B", "9.61B", "10.15B", "10.80B", "11.40B"]},
+                    {"metric": "Capital Expenditures (CapEx)", "vals": ["-1.90B", "-2.36B", "-2.55B", "-2.70B", "-2.85B"]},
+                    {"metric": "Free Cash Flow (FCF)", "vals": ["5.49B", "7.25B", "7.60B", "8.10B", "8.55B"]},
+                    {"metric": "Dividends Paid", "vals": ["-4.17B", "-4.53B", "-4.80B", "-5.10B", "-5.35B"]},
+                    {"metric": "Share Repurchases", "vals": ["-3.90B", "-4.20B", "-4.00B", "-4.20B", "-4.50B"]}
+                ]
+            },
+            "NVDA": {
+                "income_statement": [
+                    {"metric": "Revenue / Turnover", "vals": ["26.97B", "26.91B", "60.92B", "120.90B", "165.00B"]},
+                    {"metric": "Gross Profit", "vals": ["15.36B", "15.36B", "44.30B", "90.67B", "125.40B"]},
+                    {"metric": "Operating Income (EBIT)", "vals": ["10.04B", "4.22B", "32.97B", "78.50B", "110.20B"]},
+                    {"metric": "EBITDA", "vals": ["11.22B", "5.60B", "34.50B", "82.10B", "115.00B"]},
+                    {"metric": "Net Income", "vals": ["9.75B", "4.37B", "29.76B", "68.20B", "98.50B"]},
+                    {"metric": "Diluted EPS (USD)", "vals": ["0.39", "0.18", "1.19", "2.63", "3.85"]}
+                ],
+                "balance_sheet": [
+                    {"metric": "Cash & Short Term Inv.", "vals": ["19.90B", "13.30B", "25.98B", "34.80B", "48.50B"]},
+                    {"metric": "Property, Plant & Equip.", "vals": ["2.78B", "3.80B", "4.50B", "6.20B", "8.50B"]},
+                    {"metric": "Total Assets", "vals": ["44.19B", "41.18B", "65.73B", "102.50B", "145.00B"]},
+                    {"metric": "Total Long Term Debt", "vals": ["10.95B", "9.70B", "8.46B", "8.50B", "8.50B"]},
+                    {"metric": "Total Liabilities", "vals": ["17.58B", "19.08B", "22.75B", "28.50B", "35.00B"]},
+                    {"metric": "Total Equity", "vals": ["26.61B", "22.10B", "42.98B", "74.00B", "110.00B"]}
+                ],
+                "cash_flow": [
+                    {"metric": "Cash from Operations", "vals": ["9.11B", "5.64B", "28.09B", "62.40B", "92.00B"]},
+                    {"metric": "Capital Expenditures (CapEx)", "vals": ["-0.98B", "-1.83B", "-2.45B", "-3.80B", "-5.20B"]},
+                    {"metric": "Free Cash Flow (FCF)", "vals": ["8.13B", "3.81B", "25.64B", "58.60B", "86.80B"]},
+                    {"metric": "Dividends Paid", "vals": ["-0.40B", "-0.40B", "-0.40B", "-0.60B", "-0.80B"]},
+                    {"metric": "Share Repurchases", "vals": ["-2.00B", "-10.00B", "-9.50B", "-18.00B", "-25.00B"]}
+                ]
+            }
+        }
+
+        stock_data = fa_data.get(sym, {
+            "income_statement": [
+                {"metric": "Revenue / Turnover", "vals": ["8.2B", "9.5B", "10.4B", "11.2B", "12.0B"]},
+                {"metric": "Gross Profit", "vals": ["4.1B", "4.8B", "5.3B", "5.8B", "6.2B"]},
+                {"metric": "Operating Income (EBIT)", "vals": ["1.8B", "2.1B", "2.4B", "2.7B", "3.0B"]},
+                {"metric": "EBITDA", "vals": ["2.2B", "2.5B", "2.9B", "3.2B", "3.6B"]},
+                {"metric": "Net Income", "vals": ["1.2B", "1.4B", "1.6B", "1.8B", "2.1B"]},
+                {"metric": "Diluted EPS (USD)", "vals": ["3.80", "4.25", "4.90", "5.45", "6.10"]}
+            ],
+            "balance_sheet": [
+                {"metric": "Cash & Short Term Inv.", "vals": ["1.5B", "1.8B", "2.1B", "2.4B", "2.8B"]},
+                {"metric": "Total Assets", "vals": ["18.0B", "20.2B", "22.5B", "24.8B", "27.0B"]},
+                {"metric": "Total Debt", "vals": ["6.5B", "7.0B", "7.2B", "7.5B", "7.8B"]},
+                {"metric": "Total Liabilities", "vals": ["10.2B", "11.4B", "12.6B", "13.8B", "14.9B"]},
+                {"metric": "Total Equity", "vals": ["7.8B", "8.8B", "9.9B", "11.0B", "12.1B"]}
+            ],
+            "cash_flow": [
+                {"metric": "Cash from Operations", "vals": ["1.9B", "2.2B", "2.5B", "2.8B", "3.2B"]},
+                {"metric": "Capital Expenditures (CapEx)", "vals": ["-0.5B", "-0.6B", "-0.7B", "-0.8B", "-0.9B"]},
+                {"metric": "Free Cash Flow (FCF)", "vals": ["1.4B", "1.6B", "1.8B", "2.0B", "2.3B"]},
+                {"metric": "Dividends Paid", "vals": ["-0.4B", "-0.5B", "-0.5B", "-0.6B", "-0.7B"]}
+            ]
+        })
+
+        return {
+            "symbol": sym,
+            "years": years,
+            "income_statement": stock_data["income_statement"],
+            "balance_sheet": stock_data["balance_sheet"],
+            "cash_flow": stock_data["cash_flow"]
+        }
+
+    def get_relative_valuation(self, symbol: str) -> Dict[str, Any]:
+        """
+        Relative Valuation (RV) Peer Comparison Matrix.
+        """
+        sym = symbol.upper()
+        price = self.get_security_price(sym)
+        rv_groups = {
+            "MCD": {
+                "industry": "Quick Service Restaurants & Franchising",
+                "peers": [
+                    {"symbol": "MCD", "name": "McDonald's Corp", "price": 301.16, "pe": 26.4, "fwd_pe": 23.2, "ev_ebitda": 18.5, "ps": 8.5, "op_margin": "45.8%", "roe": "N/A", "div_yield": "2.22%"},
+                    {"symbol": "YUM", "name": "Yum! Brands Inc", "price": 135.40, "pe": 24.1, "fwd_pe": 21.0, "ev_ebitda": 17.2, "ps": 5.4, "op_margin": "32.4%", "roe": "N/A", "div_yield": "1.98%"},
+                    {"symbol": "QSR", "name": "Restaurant Brands Intl", "price": 72.85, "pe": 19.8, "fwd_pe": 17.5, "ev_ebitda": 14.6, "ps": 4.8, "op_margin": "29.1%", "roe": "28.5%", "div_yield": "3.18%"},
+                    {"symbol": "WEN", "name": "Wendy's Co", "price": 17.20, "pe": 18.2, "fwd_pe": 16.1, "ev_ebitda": 13.8, "ps": 1.7, "op_margin": "17.8%", "roe": "42.1%", "div_yield": "5.81%"},
+                    {"symbol": "SBUX", "name": "Starbucks Corp", "price": 96.50, "pe": 28.5, "fwd_pe": 24.8, "ev_ebitda": 16.9, "ps": 3.1, "op_margin": "15.2%", "roe": "N/A", "div_yield": "2.36%"}
+                ]
+            },
+            "NVDA": {
+                "industry": "Semiconductors & AI Accelerators",
+                "peers": [
+                    {"symbol": "NVDA", "name": "Nvidia Corp", "price": 118.90, "pe": 45.2, "fwd_pe": 32.1, "ev_ebitda": 36.4, "ps": 24.1, "op_margin": "64.9%", "roe": "115.6%", "div_yield": "0.03%"},
+                    {"symbol": "AMD", "name": "Advanced Micro Devices", "price": 152.80, "pe": 112.5, "fwd_pe": 28.4, "ev_ebitda": 42.1, "ps": 10.4, "op_margin": "11.2%", "roe": "3.8%", "div_yield": "0.00%"},
+                    {"symbol": "INTC", "name": "Intel Corp", "price": 20.80, "pe": "N/A", "fwd_pe": 18.5, "ev_ebitda": 9.2, "ps": 1.6, "op_margin": "1.2%", "roe": "-3.2%", "div_yield": "2.40%"},
+                    {"symbol": "TSM", "name": "Taiwan Semiconductor", "price": 174.20, "pe": 28.1, "fwd_pe": 22.5, "ev_ebitda": 14.8, "ps": 11.2, "op_margin": "42.5%", "roe": "27.4%", "div_yield": "1.24%"},
+                    {"symbol": "AVGO", "name": "Broadcom Inc", "price": 168.40, "pe": 65.2, "fwd_pe": 27.8, "ev_ebitda": 22.4, "ps": 15.6, "op_margin": "38.6%", "roe": "18.2%", "div_yield": "1.26%"}
+                ]
+            }
+        }
+
+        default_group = {
+            "industry": "Peer Benchmark Group",
+            "peers": [
+                {"symbol": sym, "name": f"{sym} Corp", "price": price, "pe": 22.5, "fwd_pe": 19.4, "ev_ebitda": 15.2, "ps": 3.8, "op_margin": "24.5%", "roe": "18.2%", "div_yield": "1.50%"},
+                {"symbol": "PEER1", "name": "Industry Peer Alpha", "price": 85.40, "pe": 20.1, "fwd_pe": 18.0, "ev_ebitda": 14.1, "ps": 3.2, "op_margin": "21.0%", "roe": "15.4%", "div_yield": "1.80%"},
+                {"symbol": "PEER2", "name": "Industry Peer Beta", "price": 112.20, "pe": 25.4, "fwd_pe": 21.5, "ev_ebitda": 16.8, "ps": 4.5, "op_margin": "26.4%", "roe": "20.1%", "div_yield": "1.20%"}
+            ]
+        }
+        group = rv_groups.get(sym, default_group)
+        return {
+            "symbol": sym,
+            "industry": group["industry"],
+            "peers": group["peers"]
+        }
+
+    def get_earnings_estimates(self, symbol: str) -> Dict[str, Any]:
+        """
+        Earnings Estimates (EE) Quarterly Surprises and Forward Guidance.
+        """
+        sym = symbol.upper()
+        return {
+            "symbol": sym,
+            "quarterly_history": [
+                {"quarter": "Q2 2026", "reported_eps": 3.12, "consensus_eps": 3.05, "surprise_pct": 2.30, "revenue_reported": "6.85B", "rev_surprise_pct": 1.15},
+                {"quarter": "Q1 2026", "reported_eps": 2.95, "consensus_eps": 2.90, "surprise_pct": 1.72, "revenue_reported": "6.40B", "rev_surprise_pct": 0.85},
+                {"quarter": "Q4 2025", "reported_eps": 2.82, "consensus_eps": 2.80, "surprise_pct": 0.71, "revenue_reported": "6.25B", "rev_surprise_pct": -0.40},
+                {"quarter": "Q3 2025", "reported_eps": 3.18, "consensus_eps": 3.00, "surprise_pct": 6.00, "revenue_reported": "6.69B", "rev_surprise_pct": 2.10}
+            ],
+            "forward_estimates": [
+                {"quarter": "Q3 2026E", "consensus_eps": 3.35, "high_eps": 3.50, "low_eps": 3.20, "est_revenue": "7.10B"},
+                {"quarter": "Q4 2026E", "consensus_eps": 3.20, "high_eps": 3.38, "low_eps": 3.10, "est_revenue": "6.95B"}
+            ]
+        }
+

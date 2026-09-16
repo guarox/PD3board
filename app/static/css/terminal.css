@@ -473,6 +473,62 @@ canvas#priceCanvas {
   border-color: var(--amber-primary);
 }
 
+/* Chart Controls & Technical Indicator Selector */
+.chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.indicator-selector {
+  display: flex;
+  gap: 3px;
+  border-right: 1px solid #282828;
+  padding-right: 8px;
+}
+
+.btn-indicator {
+  background: #111111;
+  border: 1px solid #282828;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+
+.btn-indicator:hover {
+  color: var(--amber-bright);
+  border-color: var(--amber-muted);
+}
+
+.btn-indicator.active {
+  background: #003344;
+  color: #00e5ff;
+  border-color: #00e5ff;
+  font-weight: bold;
+}
+
+.btn-indicator[data-indicator="SMA50"].active {
+  background: #330033;
+  color: #ff00ea;
+  border-color: #ff00ea;
+}
+
+.btn-indicator[data-indicator="BOLL"].active {
+  background: #332300;
+  color: #ffcc00;
+  border-color: #ffcc00;
+}
+
+.btn-indicator[data-indicator="RSI"].active {
+  background: #332300;
+  color: #ffb000;
+  border-color: #ffb000;
+}
+
 /* Clickable Table Rows */
 .table-data tbody tr {
   cursor: pointer;
