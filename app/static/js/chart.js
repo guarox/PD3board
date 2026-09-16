@@ -289,11 +289,15 @@ class PriceChart {
       const last = this.rawCandles[this.rawCandles.length - 1];
       const refPrice = last.close || last.open;
       if (refPrice > 0 && Math.abs(price - refPrice) / refPrice > 0.35) {
-        return;
+        last.open = price;
+        last.high = price;
+        last.low = price;
+        last.close = price;
+      } else {
+        last.high = Math.max(last.high, price);
+        last.low = Math.min(last.low, price);
+        last.close = price;
       }
-      last.high = Math.max(last.high, price);
-      last.low = Math.min(last.low, price);
-      last.close = price;
       last.volume += (size || 0);
       this.candles = this.aggregateCandles(this.rawCandles, this.interval);
     } else if (this.candles.length > 0) {

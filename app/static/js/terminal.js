@@ -290,20 +290,39 @@ class TerminalController {
     };
   }
 
+  isTickerMatch(s1, s2) {
+    if (!s1 || !s2) return false;
+    const norm1 = s1.toUpperCase().replace(/[-_]/g, '');
+    const norm2 = s2.toUpperCase().replace(/[-_]/g, '');
+    if (norm1 === norm2) return true;
+    const aliases = [
+      ['BTC', 'BTCUSD', 'BTCUSDT'],
+      ['ETH', 'ETHUSD', 'ETHUSDT'],
+      ['SOL', 'SOLUSD', 'SOLUSDT'],
+      ['SPX', '^GSPC', 'SP500'],
+      ['NDX', '^IXIC', 'NASDAQ100'],
+      ['DJI', '^DJI', 'DOW']
+    ];
+    for (const group of aliases) {
+      if (group.includes(norm1) && group.includes(norm2)) return true;
+    }
+    return false;
+  }
+
   handleStreamMessage(msg) {
     this.ticksCount++;
     const tickEl = document.getElementById('tickCounter');
     if (tickEl) tickEl.innerText = `TICKS: ${this.ticksCount}`;
 
     if (msg.type === 'tick') {
-      if (msg.symbol === this.currentTicker) {
+      if (this.isTickerMatch(msg.symbol, this.currentTicker)) {
         this.updateHeaderPrice(msg.price, msg.side);
         if (this.priceChart) {
           this.priceChart.updateLiveTick(msg.price, msg.size);
         }
       }
     } else if (msg.type === 'depth') {
-      if (msg.symbol === this.currentTicker && this.orderBookUI) {
+      if (this.isTickerMatch(msg.symbol, this.currentTicker) && this.orderBookUI) {
         this.orderBookUI.update(msg.data);
         this.updateHeaderSpread(msg.data);
       }
@@ -313,7 +332,7 @@ class TerminalController {
       this.updateEquitiesTicks(msg.data);
       if (Array.isArray(msg.data)) {
         msg.data.forEach(t => {
-          if (t.symbol === this.currentTicker) {
+          if (this.isTickerMatch(t.symbol, this.currentTicker)) {
             this.updateHeaderPrice(t.price, t.change >= 0 ? 'buy' : 'sell');
             if (this.priceChart) {
               this.priceChart.updateLiveTick(t.price, 100);
