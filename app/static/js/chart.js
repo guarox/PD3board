@@ -1,5 +1,7 @@
 /*
  * PD3board Hardware-Accelerated 60 FPS HTML5 Canvas Financial Chart
+ * Features: Candlesticks, Volume Histograms, Interactive Crosshair,
+ * Pan & Zoom, Dynamic Hover Tooltip HUD, and Time Interval Switching.
  */
 
 class PriceChart {
@@ -10,8 +12,17 @@ class PriceChart {
     this.candles = [];
     this.currentPrice = 0;
     this.symbol = 'BTCUSDT';
-    
+    this.interval = '1M';
+
+    // Interactive state: Crosshair, Tooltip, Pan & Zoom
+    this.mouse = { x: -1, y: -1, active: false };
+    this.isDragging = false;
+    this.dragStartX = 0;
+    this.panOffset = 0;
+    this.zoomLevel = 1.0; // 1.0 = normal, < 1.0 = zoomed out, > 1.0 = zoomed in
+
     this.resize();
+    this.bindEvents();
     window.addEventListener('resize', () => this.resize());
   }
 
@@ -20,9 +31,68 @@ class PriceChart {
     const rect = this.canvas.parentElement.getBoundingClientRect();
     this.canvas.width = rect.width * window.devicePixelRatio;
     this.canvas.height = rect.height * window.devicePixelRatio;
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
     this.width = rect.width;
     this.height = rect.height;
+    this.render();
+  }
+
+  bindEvents() {
+    if (!this.canvas) return;
+
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      if (this.isDragging) {
+        const dx = x - this.dragStartX;
+        this.panOffset += dx;
+        this.dragStartX = x;
+      }
+
+      this.mouse.x = x;
+      this.mouse.y = y;
+      this.mouse.active = true;
+      this.render();
+    });
+
+    this.canvas.addEventListener('mouseleave', () => {
+      this.mouse.active = false;
+      this.isDragging = false;
+      this.render();
+    });
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.isDragging = true;
+      this.dragStartX = e.clientX - rect.left;
+    });
+
+    window.addEventListener('mouseup', () => {
+      this.isDragging = false;
+    });
+
+    // Zoom on mouse wheel
+    this.canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      this.zoomLevel = Math.max(0.5, Math.min(3.0, this.zoomLevel * zoomFactor));
+      this.render();
+    }, { passive: false });
+
+    // Double-click resets pan & zoom
+    this.canvas.addEventListener('dblclick', () => {
+      this.panOffset = 0;
+      this.zoomLevel = 1.0;
+      this.render();
+    });
+  }
+
+  setInterval(interval) {
+    this.interval = interval;
+    this.panOffset = 0;
     this.render();
   }
 
@@ -30,6 +100,7 @@ class PriceChart {
     this.symbol = symbol;
     this.candles = candles || [];
     this.currentPrice = currentPrice || (this.candles.length ? this.candles[this.candles.length - 1].close : 0);
+    this.panOffset = 0;
     this.render();
   }
 
@@ -50,7 +121,7 @@ class PriceChart {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
 
-    // Background
+    // Dark Bloomberg CRT canvas background
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, this.width, this.height);
 
@@ -62,10 +133,11 @@ class PriceChart {
     }
 
     // Chart margins
-    const marginRight = 65;
+    const marginRight = 70;
     const marginBottom = 25;
+    const marginTop = 24;
     const plotWidth = this.width - marginRight;
-    const plotHeight = this.height - marginBottom;
+    const plotHeight = this.height - marginBottom - marginTop;
 
     // Calculate High / Low range
     let minPrice = Infinity;
@@ -83,12 +155,13 @@ class PriceChart {
       maxPrice = Math.max(maxPrice, this.currentPrice);
     }
 
-    // Padding
+    // Padding (5% headroom and footroom)
     const range = (maxPrice - minPrice) || 1.0;
     minPrice -= range * 0.05;
     maxPrice += range * 0.05;
 
-    const priceToY = (p) => plotHeight - ((p - minPrice) / (maxPrice - minPrice)) * plotHeight;
+    const priceToY = (p) => marginTop + plotHeight - ((p - minPrice) / (maxPrice - minPrice)) * plotHeight;
+    const yToPrice = (y) => maxPrice - ((y - marginTop) / plotHeight) * (maxPrice - minPrice);
 
     // Draw Grid Lines & Price Axis
     ctx.strokeStyle = '#1e1a0d';
@@ -96,9 +169,9 @@ class PriceChart {
     ctx.font = '10px monospace';
     ctx.fillStyle = '#996a00';
 
-    const gridSteps = 6;
+    const gridSteps = 5;
     for (let i = 0; i <= gridSteps; i++) {
-      const y = (plotHeight / gridSteps) * i;
+      const y = marginTop + (plotHeight / gridSteps) * i;
       const p = maxPrice - ((maxPrice - minPrice) / gridSteps) * i;
 
       ctx.beginPath();
@@ -109,19 +182,33 @@ class PriceChart {
       ctx.fillText(p.toFixed(2), plotWidth + 6, y + 3);
     }
 
-    // Draw Candles & Volume Bars
-    const candleWidth = Math.max(2, Math.floor(plotWidth / (this.candles.length * 1.5)));
-    const gap = candleWidth * 0.5;
+    // Calculate dynamic candle width with zoom and pan
+    const baseCandleWidth = Math.max(2, Math.floor(plotWidth / (this.candles.length * 1.5)));
+    const candleWidth = Math.max(2, Math.floor(baseCandleWidth * this.zoomLevel));
+    const gap = Math.max(1, Math.floor(candleWidth * 0.5));
+    const totalCandleSpan = candleWidth + gap;
 
+    // Bounded pan offset
+    const totalContentWidth = this.candles.length * totalCandleSpan;
+    const minPan = Math.min(0, plotWidth - totalContentWidth - 20);
+    const maxPan = 20;
+    this.panOffset = Math.max(minPan, Math.min(maxPan, this.panOffset));
+
+    let hoveredCandle = null;
+    let hoveredX = -1;
+
+    // Draw Candles & Volume Bars
     for (let i = 0; i < this.candles.length; i++) {
       const c = this.candles[i];
-      const x = i * (candleWidth + gap) + 10;
+      const x = 10 + i * totalCandleSpan + this.panOffset;
+      if (x + candleWidth < 0 || x > plotWidth) continue;
+
       const isUp = c.close >= c.open;
 
-      // Volume bar
-      const volHeight = maxVol > 0 ? (c.volume / maxVol) * (plotHeight * 0.2) : 0;
+      // Volume bar at bottom
+      const volHeight = maxVol > 0 ? (c.volume / maxVol) * (plotHeight * 0.22) : 0;
       ctx.fillStyle = isUp ? 'rgba(0, 255, 102, 0.2)' : 'rgba(255, 51, 68, 0.2)';
-      ctx.fillRect(x, plotHeight - volHeight, candleWidth, volHeight);
+      ctx.fillRect(x, marginTop + plotHeight - volHeight, candleWidth, volHeight);
 
       // Candlestick Wick
       ctx.strokeStyle = isUp ? '#00ff66' : '#ff3344';
@@ -138,25 +225,129 @@ class PriceChart {
 
       ctx.fillStyle = isUp ? '#00ff66' : '#ff3344';
       ctx.fillRect(x, bodyY, candleWidth, bodyH);
+
+      // Check mouse hover
+      if (this.mouse.active && this.mouse.x >= x - gap / 2 && this.mouse.x <= x + candleWidth + gap / 2) {
+        hoveredCandle = c;
+        hoveredX = x + candleWidth / 2;
+      }
     }
 
-    // Current Price Line
+    // Current Price Dashed Reference Line
     if (this.currentPrice > 0) {
       const liveY = priceToY(this.currentPrice);
-      ctx.strokeStyle = '#ffb000';
-      ctx.setLineDash([4, 2]);
+      if (liveY >= marginTop && liveY <= marginTop + plotHeight) {
+        ctx.strokeStyle = '#ffb000';
+        ctx.setLineDash([4, 2]);
+        ctx.beginPath();
+        ctx.moveTo(0, liveY);
+        ctx.lineTo(plotWidth, liveY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Current Price Label Badge
+        ctx.fillStyle = '#ffb000';
+        ctx.fillRect(plotWidth, liveY - 9, marginRight, 18);
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 10px monospace';
+        ctx.fillText(this.currentPrice.toFixed(2), plotWidth + 4, liveY + 4);
+      }
+    }
+
+    // Interactive Crosshair & Tooltip HUD
+    if (this.mouse.active && this.mouse.x <= plotWidth && this.mouse.y >= marginTop && this.mouse.y <= marginTop + plotHeight) {
+      const crossX = hoveredX > 0 ? hoveredX : this.mouse.x;
+      const crossY = this.mouse.y;
+
+      // Crosshair lines
+      ctx.strokeStyle = 'rgba(255, 176, 0, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+
+      // Vertical line
       ctx.beginPath();
-      ctx.moveTo(0, liveY);
-      ctx.lineTo(plotWidth, liveY);
+      ctx.moveTo(crossX, marginTop);
+      ctx.lineTo(crossX, marginTop + plotHeight);
+      ctx.stroke();
+
+      // Horizontal line
+      ctx.beginPath();
+      ctx.moveTo(0, crossY);
+      ctx.lineTo(plotWidth, crossY);
       ctx.stroke();
       ctx.setLineDash([]);
 
-      // Current Price Label Badge
-      ctx.fillStyle = '#ffb000';
-      ctx.fillRect(plotWidth, liveY - 9, marginRight, 18);
+      // Price indicator on Y-axis
+      const hoverPrice = yToPrice(crossY);
+      ctx.fillStyle = '#ffcc00';
+      ctx.fillRect(plotWidth, crossY - 8, marginRight, 16);
       ctx.fillStyle = '#000000';
-      ctx.font = 'bold 10px monospace';
-      ctx.fillText(this.currentPrice.toFixed(2), plotWidth + 4, liveY + 4);
+      ctx.font = 'bold 9px monospace';
+      ctx.fillText(hoverPrice.toFixed(2), plotWidth + 4, crossY + 4);
+
+      // Top HUD Bar showing candle metrics
+      if (hoveredCandle) {
+        const c = hoveredCandle;
+        const chg = c.close - c.open;
+        const chgPct = (chg / c.open) * 100;
+        const chgColor = chg >= 0 ? '#00ff66' : '#ff3344';
+        const sign = chg >= 0 ? '+' : '';
+
+        ctx.fillStyle = '#111111';
+        ctx.fillRect(0, 0, plotWidth, marginTop);
+        ctx.strokeStyle = '#332300';
+        ctx.strokeRect(0, 0, plotWidth, marginTop);
+
+        ctx.font = 'bold 11px monospace';
+        ctx.fillStyle = '#ffb000';
+        let tx = 8;
+        ctx.fillText(this.symbol, tx, 16); tx += 65;
+
+        ctx.font = '10px monospace';
+        ctx.fillStyle = '#888';
+        ctx.fillText('O:', tx, 16); tx += 15;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(c.open.toFixed(2), tx, 16); tx += 55;
+
+        ctx.fillStyle = '#888';
+        ctx.fillText('H:', tx, 16); tx += 15;
+        ctx.fillStyle = '#00ff66';
+        ctx.fillText(c.high.toFixed(2), tx, 16); tx += 55;
+
+        ctx.fillStyle = '#888';
+        ctx.fillText('L:', tx, 16); tx += 15;
+        ctx.fillStyle = '#ff3344';
+        ctx.fillText(c.low.toFixed(2), tx, 16); tx += 55;
+
+        ctx.fillStyle = '#888';
+        ctx.fillText('C:', tx, 16); tx += 15;
+        ctx.fillStyle = '#fff';
+        ctx.fillText(c.close.toFixed(2), tx, 16); tx += 55;
+
+        ctx.fillStyle = '#888';
+        ctx.fillText('CHG:', tx, 16); tx += 28;
+        ctx.fillStyle = chgColor;
+        ctx.fillText(`${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%)`, tx, 16); tx += 95;
+
+        ctx.fillStyle = '#888';
+        ctx.fillText('VOL:', tx, 16); tx += 28;
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillText(Math.round(c.volume).toLocaleString(), tx, 16);
+      }
+    } else {
+      // Default top info bar when not hovering
+      ctx.fillStyle = '#111111';
+      ctx.fillRect(0, 0, plotWidth, marginTop);
+      ctx.strokeStyle = '#222';
+      ctx.strokeRect(0, 0, plotWidth, marginTop);
+
+      ctx.font = 'bold 11px monospace';
+      ctx.fillStyle = '#ffb000';
+      ctx.fillText(`${this.symbol} [${this.interval}] INTRADAY CANDLESTICK ACTION (60 FPS)`, 8, 16);
+
+      ctx.font = '10px monospace';
+      ctx.fillStyle = '#888';
+      ctx.fillText('DOUBLE-CLICK TO RESET ZOOM / DRAG TO PAN', plotWidth - 250, 16);
     }
   }
 }

@@ -20,6 +20,7 @@ from app.feeds.coinbase import CoinbaseFeed
 from app.feeds.equities import EquitiesFeed
 from app.feeds.news import NewsFeed
 from app.feeds.yield_curve import YieldCurveFeed
+from app.feeds.eco import EcoFeed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("pd3board")
@@ -59,6 +60,7 @@ for i in range(60):
 equities_feed = EquitiesFeed()
 news_feed = NewsFeed()
 yield_curve_feed = YieldCurveFeed()
+eco_feed = EcoFeed()
 
 active_connections: Set[WebSocket] = set()
 
@@ -190,15 +192,18 @@ async def execute_command(req: CommandRequest):
         data = yield_curve_feed.get_curve()
     elif fn == "DES":
         data = equities_feed.get_security_description(ticker)
+    elif fn == "ECO":
+        data = {"events": eco_feed.get_events()}
     elif fn == "HELP":
         data = {
             "help": [
-                {"mnemonic": "GP", "desc": "Price Graph (Interactive candlestick & tick chart)"},
-                {"mnemonic": "L2", "desc": "Level 2 Order Book Depth Ladder"},
-                {"mnemonic": "WEI", "desc": "World Equity Indices & Macro Rates"},
-                {"mnemonic": "DES", "desc": "Security Description & Capital Structure"},
-                {"mnemonic": "TOP", "desc": "Top Financial Market News Wire"},
-                {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve"}
+                {"mnemonic": "GP", "desc": "Price Graph (Interactive candlestick & tick chart with 60 FPS Canvas)"},
+                {"mnemonic": "L2", "desc": "Level 2 Order Book Depth Ladder with Spread in BPS"},
+                {"mnemonic": "WEI", "desc": "World Equity Indices & Macro Rates (SPX, NDX, DJI, etc.)"},
+                {"mnemonic": "DES", "desc": "Security Description, Fundamentals & Capital Structure"},
+                {"mnemonic": "TOP", "desc": "Top Financial Market News Wire with Ticker Tagging"},
+                {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve (1M to 30Y)"},
+                {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"}
             ]
         }
 
@@ -219,6 +224,35 @@ async def get_yield_curve():
 @app.get("/api/news")
 async def get_news():
     return news_feed.get_latest_news()
+
+@app.get("/api/eco")
+async def get_eco():
+    return eco_feed.get_events()
+
+@app.get("/api/des/{symbol}")
+async def get_des(symbol: str):
+    return equities_feed.get_security_description(symbol)
+
+@app.get("/api/help")
+async def get_help():
+    return {
+        "functions": [
+            {"mnemonic": "GP", "desc": "Price Graph (Interactive candlestick & tick chart with 60 FPS Canvas)"},
+            {"mnemonic": "L2", "desc": "Level 2 Order Book Depth Ladder with Spread in BPS"},
+            {"mnemonic": "WEI", "desc": "World Equity Indices & Macro Rates (SPX, NDX, DJI, etc.)"},
+            {"mnemonic": "DES", "desc": "Security Description, Fundamentals & Capital Structure"},
+            {"mnemonic": "TOP", "desc": "Top Financial Market News Wire with Ticker Tagging"},
+            {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve (1M to 30Y)"},
+            {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"}
+        ],
+        "sectors": ["EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"],
+        "shortcuts": [
+            {"key": "/", "action": "Focus Bloomberg command line"},
+            {"key": "Esc", "action": "Clear command input buffer"},
+            {"key": "<GO>", "action": "Execute entered command"},
+            {"key": "<CNCL>", "action": "Cancel current command input"}
+        ]
+    }
 
 @app.get("/api/orderbook/{symbol}")
 async def get_orderbook(symbol: str):
