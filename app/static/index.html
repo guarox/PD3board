@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PD3board // Professional Financial Terminal Workstation</title>
   <link rel="stylesheet" href="/static/css/terminal.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000'/><rect x='15' y='40' width='16' height='45' fill='%23ffb000'/><rect x='42' y='20' width='16' height='65' fill='%2300ff66'/><rect x='69' y='35' width='16' height='50' fill='%23ff3344'/></svg>">
 </head>
 <body>
   <div class="crt-overlay" id="crtOverlay"></div>
@@ -127,10 +127,10 @@
         </div>
         <div class="neu" style="font-size: 10px;">REAL-TIME TICKER</div>
       </div>
-      <div class="panel-body" style="overflow-y: auto;">
-        <div id="yieldCurveData"></div>
-        <div style="border-top: 1px solid var(--border-amber); padding-top: 6px;">
-          <div style="font-size: 10px; color: var(--amber-muted); margin-bottom: 4px; font-weight: bold;">LIVE HEADLINE WIRE</div>
+      <div class="panel-body panel-split">
+        <div class="split-col split-rates" id="yieldCurveData"></div>
+        <div class="split-col split-news">
+          <div class="wire-header">LIVE HEADLINE WIRE</div>
           <div id="newsList"></div>
         </div>
       </div>

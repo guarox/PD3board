@@ -106,59 +106,103 @@ body {
   background: #141414;
 }
 
+.command-prompt,
 .cmd-prefix {
   color: var(--bloomberg-green);
   font-weight: bold;
   font-size: 14px;
+  user-select: none;
 }
 
+.command-input,
 .cmd-input {
   flex: 1;
   background: #000000;
   border: 1px solid var(--amber-muted);
   color: var(--amber-bright);
   font-family: var(--font-mono);
-  font-size: 14px;
-  padding: 4px 10px;
+  font-size: 13px;
+  padding: 5px 10px;
   outline: none;
   text-transform: uppercase;
+  border-radius: 2px;
+  letter-spacing: 0.5px;
 }
 
+.command-input:focus,
 .cmd-input:focus {
   border-color: var(--amber-primary);
-  box-shadow: 0 0 5px rgba(255, 176, 0, 0.4);
+  box-shadow: 0 0 6px rgba(255, 176, 0, 0.45);
 }
 
+.command-input::placeholder,
+.cmd-input::placeholder {
+  color: #554010;
+  font-size: 11px;
+}
+
+.keypad-cluster {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.btn-sector,
+.btn-action,
 .btn-key {
-  padding: 3px 8px;
+  padding: 4px 8px;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: bold;
   border: 1px solid #333;
   cursor: pointer;
   text-transform: uppercase;
+  border-radius: 2px;
+  transition: all 0.15s ease;
 }
 
+.btn-sector,
 .key-sector {
   background: #2a2200;
   color: var(--bloomberg-yellow);
   border-color: #665200;
 }
 
+.btn-sector:hover,
 .key-sector:hover {
   background: #443700;
+  color: #ffffff;
+  border-color: var(--amber-primary);
 }
 
+.btn-go,
 .key-go {
   background: #00441b;
   color: #00ff66;
   border-color: #008833;
 }
 
+.btn-go:hover,
+.key-go:hover {
+  background: #006629;
+  color: #ffffff;
+  border-color: #00cc44;
+  box-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
+}
+
+.btn-cancel,
 .key-cancel {
   background: #44000b;
   color: #ff4455;
   border-color: #880011;
+}
+
+.btn-cancel:hover,
+.key-cancel:hover {
+  background: #660011;
+  color: #ffffff;
+  border-color: #cc0022;
+  box-shadow: 0 0 8px rgba(255, 51, 68, 0.3);
 }
 
 /* Function Bar */
@@ -241,13 +285,15 @@ body {
 }
 
 /* Tables & Grids */
-table.terminal-table {
+table.terminal-table,
+table.table-data {
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 }
 
-table.terminal-table th {
+table.terminal-table th,
+table.table-data th {
   text-align: left;
   padding: 4px 6px;
   color: var(--text-muted);
@@ -256,7 +302,8 @@ table.terminal-table th {
   font-size: 11px;
 }
 
-table.terminal-table td {
+table.terminal-table td,
+table.table-data td {
   padding: 4px 6px;
   border-bottom: 1px solid #1c1c1c;
 }
@@ -573,4 +620,100 @@ canvas#priceCanvas {
 .impact-high { background: rgba(255, 51, 68, 0.25); color: #ff3344; border: 1px solid #ff3344; }
 .impact-med { background: rgba(255, 176, 0, 0.25); color: #ffb000; border: 1px solid #ffb000; }
 .impact-low { background: rgba(0, 255, 102, 0.25); color: #00ff66; border: 1px solid #00ff66; }
+
+/* Split Layout for Panel 4 (Yields & News) */
+.panel-split {
+  display: grid;
+  grid-template-columns: 270px 1fr;
+  gap: 8px;
+  height: 100%;
+  padding: 6px;
+  overflow: hidden;
+}
+
+.split-col {
+  overflow-y: auto;
+  height: 100%;
+}
+
+.split-rates {
+  border-right: 1px solid var(--border-amber);
+  padding-right: 8px;
+}
+
+.wire-header {
+  font-size: 10px;
+  color: var(--amber-muted);
+  margin-bottom: 4px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+/* Custom Bloomberg CRT Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-amber);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--amber-muted);
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1024px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    overflow-y: auto;
+  }
+  .panel {
+    min-height: 320px;
+  }
+  .panel-split {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .split-rates {
+    border-right: none;
+    border-bottom: 1px solid var(--border-amber);
+    padding-bottom: 8px;
+    padding-right: 0;
+  }
+  .command-bar {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .status-cluster {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .function-bar {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .terminal-footer {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .footer-cluster {
+    flex-wrap: wrap;
+  }
+}
+
 

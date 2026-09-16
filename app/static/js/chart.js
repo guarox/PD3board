@@ -24,15 +24,20 @@ class PriceChart {
     this.resize();
     this.bindEvents();
     window.addEventListener('resize', () => this.resize());
+    if (typeof ResizeObserver !== 'undefined' && this.canvas.parentElement) {
+      this.resizeObserver = new ResizeObserver(() => this.resize());
+      this.resizeObserver.observe(this.canvas.parentElement);
+    }
   }
 
   resize() {
     if (!this.canvas) return;
     const rect = this.canvas.parentElement.getBoundingClientRect();
-    this.canvas.width = rect.width * window.devicePixelRatio;
-    this.canvas.height = rect.height * window.devicePixelRatio;
+    if (rect.width === 0 || rect.height === 0) return;
+    this.canvas.width = rect.width * (window.devicePixelRatio || 1);
+    this.canvas.height = rect.height * (window.devicePixelRatio || 1);
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-    this.ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    this.ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1);
     this.width = rect.width;
     this.height = rect.height;
     this.render();
@@ -90,15 +95,55 @@ class PriceChart {
     });
   }
 
+  aggregateCandles(rawCandles, interval) {
+    if (!rawCandles || rawCandles.length === 0) return [];
+    if (interval === '1M') return [...rawCandles];
+
+    let groupSize = 5;
+    if (interval === '5M') groupSize = 5;
+    else if (interval === '15M') groupSize = 15;
+    else if (interval === '1H') groupSize = 30;
+    else if (interval === '1D') groupSize = 60;
+
+    const aggregated = [];
+    for (let i = 0; i < rawCandles.length; i += groupSize) {
+      const chunk = rawCandles.slice(i, i + groupSize);
+      if (chunk.length === 0) continue;
+      const first = chunk[0];
+      const last = chunk[chunk.length - 1];
+      let high = -Infinity;
+      let low = Infinity;
+      let totalVol = 0;
+      for (const c of chunk) {
+        if (c.high > high) high = c.high;
+        if (c.low < low) low = c.low;
+        totalVol += (c.volume || 0);
+      }
+      aggregated.push({
+        time: first.time,
+        open: first.open,
+        high: high,
+        low: low,
+        close: last.close,
+        volume: totalVol
+      });
+    }
+    return aggregated;
+  }
+
   setInterval(interval) {
     this.interval = interval;
     this.panOffset = 0;
+    if (this.rawCandles && this.rawCandles.length > 0) {
+      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
+    }
     this.render();
   }
 
   setData(symbol, candles, currentPrice) {
     this.symbol = symbol;
-    this.candles = candles || [];
+    this.rawCandles = candles || [];
+    this.candles = this.aggregateCandles(this.rawCandles, this.interval);
     this.currentPrice = currentPrice || (this.candles.length ? this.candles[this.candles.length - 1].close : 0);
     this.panOffset = 0;
     this.render();
@@ -107,13 +152,20 @@ class PriceChart {
   updateLiveTick(price, size) {
     if (!price || isNaN(price)) return;
     this.currentPrice = price;
-    if (this.candles.length > 0) {
-      const last = this.candles[this.candles.length - 1];
+    if (this.rawCandles && this.rawCandles.length > 0) {
+      const last = this.rawCandles[this.rawCandles.length - 1];
       // Defensive outlier guard: prevent mismatched cross-asset ticks from distorting the candle
       const refPrice = last.close || last.open;
       if (refPrice > 0 && Math.abs(price - refPrice) / refPrice > 0.35) {
         return;
       }
+      last.high = Math.max(last.high, price);
+      last.low = Math.min(last.low, price);
+      last.close = price;
+      last.volume += (size || 0);
+      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
+    } else if (this.candles.length > 0) {
+      const last = this.candles[this.candles.length - 1];
       last.high = Math.max(last.high, price);
       last.low = Math.min(last.low, price);
       last.close = price;
