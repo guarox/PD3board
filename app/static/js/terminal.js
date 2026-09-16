@@ -311,11 +311,11 @@ class TerminalController {
       const res = await fetch(`/api/ticks/${ticker}`);
       if (res.ok) {
         const data = await res.json();
-        if (this.priceChart && data.candles) {
+        if (this.priceChart && data.candles && this.currentTicker === ticker) {
           this.priceChart.setData(ticker, data.candles);
           if (data.candles.length > 0) {
             const last = data.candles[data.candles.length - 1];
-            this.updateHeaderPrice(last.close, 'buy');
+            this.updateHeaderPrice(last.close, last.close >= last.open ? 'buy' : 'sell');
           }
         }
       }
@@ -361,6 +361,12 @@ class TerminalController {
         // Update Header
         const symbolBadge = document.getElementById('activeSymbol');
         if (symbolBadge) symbolBadge.innerText = `${this.currentTicker} ${this.currentSector}`;
+
+        if (resp.data && resp.data.candles && resp.data.candles.length > 0) {
+          if (this.priceChart) this.priceChart.setData(this.currentTicker, resp.data.candles);
+          const lastCandle = resp.data.candles[resp.data.candles.length - 1];
+          this.updateHeaderPrice(lastCandle.close, lastCandle.close >= lastCandle.open ? 'buy' : 'sell');
+        }
 
         this.loadHistoricalData(this.currentTicker);
         this.loadOrderBook(this.currentTicker);
