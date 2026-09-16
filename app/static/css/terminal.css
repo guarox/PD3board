@@ -368,4 +368,209 @@ canvas#priceCanvas {
 .footer-cluster {
   display: flex;
   gap: 16px;
+  align-items: center;
 }
+
+/* Footer Interactive Buttons */
+.btn-footer {
+  background: #151515;
+  border: 1px solid #332300;
+  color: var(--amber-primary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 1px 6px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s ease;
+}
+
+.btn-footer:hover {
+  background: var(--amber-dark);
+  color: var(--amber-bright);
+  border-color: var(--amber-primary);
+}
+
+.btn-footer.active {
+  background: var(--amber-primary);
+  color: #000000;
+  font-weight: bold;
+}
+
+/* Interval Selector */
+.interval-selector {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-interval {
+  background: #111111;
+  border: 1px solid #282828;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  padding: 1px 5px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.15s;
+}
+
+.btn-interval:hover {
+  color: var(--amber-bright);
+  border-color: var(--amber-muted);
+}
+
+.btn-interval.active {
+  background: var(--amber-primary);
+  color: #000000;
+  font-weight: bold;
+  border-color: var(--amber-primary);
+}
+
+/* Clickable Table Rows */
+.table-data tbody tr {
+  cursor: pointer;
+  transition: background-color 0.1s;
+}
+
+.table-data tbody tr:hover {
+  background-color: #1a1608;
+}
+
+/* Terminal Modal Overlays (DES, HELP, ECO) */
+.terminal-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 820px;
+  max-width: 95vw;
+  max-height: 85vh;
+  background: #0d0d0d;
+  border: 2px solid var(--amber-primary);
+  box-shadow: 0 0 35px rgba(255, 176, 0, 0.25), 0 0 10px rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.terminal-modal.hidden {
+  display: none;
+}
+
+.modal-header {
+  background: #000000;
+  border-bottom: 2px solid var(--amber-primary);
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: bold;
+  font-size: 13px;
+  color: var(--amber-bright);
+}
+
+.modal-close {
+  background: var(--bloomberg-red);
+  color: #000;
+  border: none;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  background: #ff6677;
+}
+
+.modal-body {
+  padding: 14px;
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text-white);
+}
+
+/* Modal Content Grid */
+.des-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.des-card {
+  background: #141414;
+  border: 1px solid #282828;
+  padding: 10px;
+}
+
+.des-card-title {
+  color: var(--amber-primary);
+  font-weight: bold;
+  font-size: 11px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #282828;
+  padding-bottom: 4px;
+  letter-spacing: 0.5px;
+}
+
+.des-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  border-bottom: 1px dotted #1f1f1f;
+  font-size: 11px;
+}
+
+.des-label {
+  color: var(--text-muted);
+}
+
+.des-val {
+  color: var(--text-white);
+  font-weight: bold;
+}
+
+/* Help & Eco Table Styling */
+.modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.modal-table th {
+  background: #1a1a1a;
+  color: var(--amber-primary);
+  text-align: left;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-amber);
+}
+
+.modal-table td {
+  padding: 5px 8px;
+  border-bottom: 1px solid #1c1c1c;
+}
+
+.modal-table tr:hover {
+  background: #141414;
+}
+
+.impact-badge {
+  font-size: 9px;
+  font-weight: bold;
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.impact-high { background: rgba(255, 51, 68, 0.25); color: #ff3344; border: 1px solid #ff3344; }
+.impact-med { background: rgba(255, 176, 0, 0.25); color: #ffb000; border: 1px solid #ffb000; }
+.impact-low { background: rgba(0, 255, 102, 0.25); color: #00ff66; border: 1px solid #00ff66; }
+

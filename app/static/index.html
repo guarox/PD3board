@@ -3,37 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PD3board - Financial Workstation</title>
+  <title>PD3board // Professional Financial Terminal Workstation</title>
   <link rel="stylesheet" href="/static/css/terminal.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 </head>
 <body>
-  <div class="crt-overlay"></div>
+  <div class="crt-overlay" id="crtOverlay"></div>
 
   <!-- Terminal Header -->
   <header class="terminal-header">
     <div class="top-bar">
       <div style="display: flex; align-items: center; gap: 10px;">
         <span class="brand-badge">PD3BOARD</span>
-        <span style="color: var(--amber-muted);">PROFESSIONAL SERVICE EMULATOR</span>
+        <span style="color: var(--amber-primary); font-weight: bold;">BLOOMBERG WORKSTATION EMULATOR</span>
+        <span class="neu">|</span>
+        <span class="security-badge" id="activeSymbol">BTCUSDT CRNCY</span>
       </div>
       <div class="status-cluster">
-        <div class="status-item">SECURITY: <span id="activeSymbol">BTCUSDT CRNCY</span></div>
-        <div class="status-item">LAST: <span id="livePrice">--</span></div>
-        <div class="status-item"><span id="liveClock">13:30:00 EST</span></div>
+        <div class="status-item">LAST: <span id="livePrice">0.00</span></div>
+        <div class="status-item">BID/ASK: <span id="headerSpread">0.00 / 0.00</span></div>
+        <div class="status-item" id="terminalClock" style="cursor: pointer;" title="Click to toggle EST/UTC">14:00:00 EST</div>
       </div>
     </div>
 
-    <!-- Bloomberg Command Line -->
+    <!-- Command Input Bar -->
     <div class="command-bar">
-      <span class="cmd-prefix">&gt;</span>
-      <input type="text" id="cmdInput" class="cmd-input" placeholder="ENTER TICKER / MNEMONIC (E.G. AAPL US EQUITY GP <GO>)" autofocus spellcheck="false" autocomplete="off">
-      <div style="display: flex; gap: 4px;">
-        <button class="btn-key key-sector" data-action="sector" data-val="EQUITY">EQUITY</button>
-        <button class="btn-key key-sector" data-action="sector" data-val="CRNCY">CRNCY</button>
-        <button class="btn-key key-sector" data-action="sector" data-val="INDEX">INDEX</button>
-        <button class="btn-key key-sector" data-action="sector" data-val="GOVT">GOVT</button>
-        <button class="btn-key key-go" data-action="go">&lt;GO&gt;</button>
-        <button class="btn-key key-cancel" data-action="cancel">&lt;CNCL&gt;</button>
+      <span class="command-prompt">&gt;</span>
+      <input type="text" id="commandInput" class="command-input" placeholder="ENTER TICKER / MNEMONIC (e.g. MCD US EQUITY GP &lt;GO&gt;, DES, WEI, ECO, HELP) OR PRESS /" autocomplete="off" spellcheck="false">
+      <div class="keypad-cluster">
+        <button class="btn-sector" data-sector="EQUITY">EQUITY</button>
+        <button class="btn-sector" data-sector="CRNCY">CRNCY</button>
+        <button class="btn-sector" data-sector="INDEX">INDEX</button>
+        <button class="btn-sector" data-sector="GOVT">GOVT</button>
+        <button class="btn-action btn-go" id="btnGo">&lt;GO&gt;</button>
+        <button class="btn-action btn-cancel" id="btnCancel">&lt;CNCL&gt;</button>
       </div>
     </div>
 
@@ -45,6 +48,8 @@
       <div class="fn-tab" data-fn="TOP">TOP (NEWS)</div>
       <div class="fn-tab" data-fn="YCRV">YCRV (YIELDS)</div>
       <div class="fn-tab" data-fn="DES">DES (DESCRIPTION)</div>
+      <div class="fn-tab" data-fn="ECO">ECO (CALENDAR)</div>
+      <div class="fn-tab" data-fn="HELP">HELP (GUIDE)</div>
     </div>
   </header>
 
@@ -57,7 +62,13 @@
           <span class="badge">GP</span>
           <span>GRAPHICAL PRICE ACTION (60 FPS CANVAS)</span>
         </div>
-        <div class="neu" style="font-size: 10px;">INTRADAY 1M BARS</div>
+        <div class="interval-selector">
+          <button class="btn-interval active" data-interval="1M">1M</button>
+          <button class="btn-interval" data-interval="5M">5M</button>
+          <button class="btn-interval" data-interval="15M">15M</button>
+          <button class="btn-interval" data-interval="1H">1H</button>
+          <button class="btn-interval" data-interval="1D">1D</button>
+        </div>
       </div>
       <div class="panel-body" style="padding: 0;">
         <div class="chart-container">
@@ -85,38 +96,38 @@
       <div class="panel-header">
         <div class="panel-title">
           <span class="badge">WEI</span>
-          <span>WORLD EQUITY INDICES &amp; MACRO BENCHMARKS</span>
+          <span>WORLD EQUITY INDICES MONITOR</span>
         </div>
-        <div class="neu" style="font-size: 10px;">GLOBAL BENCHMARKS</div>
+        <div class="neu" style="font-size: 10px;">CLICK ROW TO LOAD</div>
       </div>
-      <div class="panel-body">
-        <table class="terminal-table">
+      <div class="panel-body" style="padding: 0;">
+        <table class="table-data" id="weiTable">
           <thead>
             <tr>
-              <th>SYMBOL</th>
+              <th>INDEX</th>
               <th>NAME</th>
-              <th class="text-right">PRICE</th>
-              <th class="text-right">NET CHG</th>
-              <th class="text-right">% CHG</th>
+              <th class="text-right">VAL</th>
+              <th class="text-right">NET</th>
+              <th class="text-right">%CHG</th>
             </tr>
           </thead>
           <tbody id="weiBody">
-            <tr><td colspan="5" class="neu text-center">Loading World Indices...</td></tr>
+            <tr><td colspan="5" class="neu" style="text-align: center; padding: 20px;">Streaming World Indices...</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Pane 4: News Wire & Yield Curve (TOP / YCRV) -->
+    <!-- Pane 4: Macro Yields & Top News Wire (YCRV & TOP) -->
     <div class="panel" id="panelNews">
       <div class="panel-header">
         <div class="panel-title">
-          <span class="badge">TOP</span>
-          <span>BREAKING FINANCIAL NEWS &amp; YIELD CURVE</span>
+          <span class="badge">TOP / YCRV</span>
+          <span>MACRO RATES &amp; BREAKING WIRE</span>
         </div>
-        <div class="neu" style="font-size: 10px;">REAL-TIME WIRE</div>
+        <div class="neu" style="font-size: 10px;">REAL-TIME TICKER</div>
       </div>
-      <div class="panel-body" style="display: flex; flex-direction: column; gap: 10px;">
+      <div class="panel-body" style="overflow-y: auto;">
         <div id="yieldCurveData"></div>
         <div style="border-top: 1px solid var(--border-amber); padding-top: 6px;">
           <div style="font-size: 10px; color: var(--amber-muted); margin-bottom: 4px; font-weight: bold;">LIVE HEADLINE WIRE</div>
@@ -126,11 +137,28 @@
     </div>
   </main>
 
+  <!-- Bloomberg Modal Screen (DES, HELP, ECO) -->
+  <div id="terminalModal" class="terminal-modal hidden">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">
+        <span class="badge" id="modalBadge">DES</span>
+        <span id="modalHeading">SECURITY DESCRIPTION</span>
+      </div>
+      <button class="modal-close" id="modalClose">&lt;CNCL&gt;</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <!-- Injected dynamically -->
+    </div>
+  </div>
+
   <!-- Status Footer -->
   <footer class="terminal-footer">
     <div class="footer-cluster">
       <div>MARKETS: <span class="pos">NYSE: OPEN</span> | <span class="pos">LSE: OPEN</span> | <span class="neu">TSE: CLOSED</span></div>
       <div id="tickCounter">TICKS: 0</div>
+      <button id="toggleAudio" class="btn-footer">AUDIO: OFF</button>
+      <button id="toggleCrt" class="btn-footer active">CRT: ON</button>
+      <button id="toggleClock" class="btn-footer">TIME: EST</button>
     </div>
     <div class="footer-cluster">
       <div id="wsLatency">WS: CONNECTING...</div>

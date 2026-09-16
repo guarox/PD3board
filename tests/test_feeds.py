@@ -2,6 +2,7 @@ import pytest
 from app.feeds.equities import EquitiesFeed
 from app.feeds.yield_curve import YieldCurveFeed
 from app.feeds.news import NewsFeed
+from app.feeds.eco import EcoFeed
 from app.engine.tick_buffer import TickBuffer
 
 def test_equities_feed():
@@ -12,9 +13,18 @@ def test_equities_feed():
     assert "SPX" in symbols
     assert "NDX" in symbols
 
-    desc = feed.get_security_description("AAPL")
-    assert desc["symbol"] == "AAPL"
-    assert "market_cap" in desc
+    desc_aapl = feed.get_security_description("AAPL")
+    assert desc_aapl["symbol"] == "AAPL"
+    assert "market_cap" in desc_aapl
+    assert desc_aapl["pe"] == 33.8
+    assert desc_aapl["ceo"] == "Tim Cook"
+
+    desc_mcd = feed.get_security_description("MCD")
+    assert desc_mcd["symbol"] == "MCD"
+    assert desc_mcd["name"] == "MCDONALD'S CORP"
+    assert desc_mcd["pe"] == 26.4
+    assert desc_mcd["market_cap"] == "214.5B"
+    assert desc_mcd["exchange"] == "NYSE"
 
 def test_yield_curve_feed():
     feed = YieldCurveFeed()
@@ -27,6 +37,15 @@ def test_news_feed():
     news = feed.get_latest_news()
     assert len(news) > 0
     assert "headline" in news[0]
+
+def test_eco_feed():
+    feed = EcoFeed()
+    events = feed.get_events()
+    assert len(events) >= 5
+    event = events[0]
+    assert "indicator" in event
+    assert "actual" in event
+    assert "impact" in event
 
 def test_tick_buffer_candles():
     tb = TickBuffer("BTCUSDT", max_ticks=10)
@@ -54,4 +73,3 @@ def test_coinbase_feed_instantiation():
     feed = CoinbaseFeed(symbol="BTC-USD")
     assert feed.unified_symbol == "BTCUSD"
     assert feed.running is False
-
