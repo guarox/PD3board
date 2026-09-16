@@ -49,3 +49,9 @@ def test_tick_buffer_candles():
     assert c2["close"] == 102.0
     assert c2["volume"] == 1.5
 
+def test_coinbase_feed_instantiation():
+    from app.feeds.coinbase import CoinbaseFeed
+    feed = CoinbaseFeed(symbol="BTC-USD")
+    assert feed.unified_symbol == "BTCUSD"
+    assert feed.running is False
+
