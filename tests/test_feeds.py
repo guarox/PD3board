@@ -26,6 +26,41 @@ def test_equities_feed():
     assert desc_mcd["market_cap"] == "214.5B"
     assert desc_mcd["exchange"] == "NYSE"
 
+    anr = feed.get_analyst_recommendations("MCD")
+    assert anr["symbol"] == "MCD"
+    assert anr["consensus"] == "MODERATE BUY"
+    assert anr["total_analysts"] >= 20
+    assert len(anr["brokers"]) >= 3
+
+    fa = feed.get_financial_analysis("MCD")
+    assert fa["symbol"] == "MCD"
+    assert len(fa["years"]) == 5
+    assert len(fa["income_statement"]) >= 5
+
+    rv = feed.get_relative_valuation("MCD")
+    assert rv["symbol"] == "MCD"
+    assert len(rv["peers"]) >= 4
+
+    ee = feed.get_earnings_estimates("MCD")
+    assert ee["symbol"] == "MCD"
+    assert len(ee["quarterly_history"]) >= 4
+
+def test_world_macro_feed():
+    from app.feeds.world_macro import WorldMacroFeed
+    feed = WorldMacroFeed()
+    
+    wirp = feed.get_wirp()
+    assert "current_target_rate" in wirp
+    assert len(wirp["meetings"]) >= 3
+
+    wcrs = feed.get_wcrs()
+    assert len(wcrs) >= 6
+    assert any(c["code"] == "JPY" for c in wcrs)
+
+    fdm = feed.get_fdm()
+    assert len(fdm) >= 6
+    assert any(c["symbol"] == "CL1" for c in fdm)
+
 def test_yield_curve_feed():
     feed = YieldCurveFeed()
     curve = feed.get_curve()

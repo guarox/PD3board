@@ -1,7 +1,8 @@
 /*
  * PD3board Hardware-Accelerated 60 FPS HTML5 Canvas Financial Chart
  * Features: Candlesticks, Volume Histograms, Interactive Crosshair,
- * Pan & Zoom, Dynamic Hover Tooltip HUD, and Time Interval Switching.
+ * Pan & Zoom, Dynamic Hover Tooltip HUD, Time Interval Switching,
+ * Technical Overlays (SMA 20, SMA 50, Bollinger Bands), and RSI Sub-Pane.
  */
 
 class PriceChart {
@@ -10,16 +11,25 @@ class PriceChart {
     if (!canvasId || !this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
     this.candles = [];
+    this.rawCandles = [];
     this.currentPrice = 0;
     this.symbol = 'BTCUSDT';
     this.interval = '1M';
+
+    // Technical Indicators
+    this.indicators = {
+      SMA20: false,
+      SMA50: false,
+      BOLL: false,
+      RSI: false
+    };
 
     // Interactive state: Crosshair, Tooltip, Pan & Zoom
     this.mouse = { x: -1, y: -1, active: false };
     this.isDragging = false;
     this.dragStartX = 0;
     this.panOffset = 0;
-    this.zoomLevel = 1.0; // 1.0 = normal, < 1.0 = zoomed out, > 1.0 = zoomed in
+    this.zoomLevel = 1.0;
 
     this.resize();
     this.bindEvents();
@@ -95,37 +105,122 @@ class PriceChart {
     });
   }
 
+  toggleIndicator(name) {
+    if (this.indicators.hasOwnProperty(name)) {
+      this.indicators[name] = !this.indicators[name];
+      this.render();
+      return this.indicators[name];
+    }
+    return false;
+  }
+
+  calculateSMA(period) {
+    const sma = [];
+    for (let i = 0; i < this.candles.length; i++) {
+      if (i < period - 1) {
+        sma.push(null);
+      } else {
+        let sum = 0;
+        for (let j = 0; j < period; j++) {
+          sum += this.candles[i - j].close;
+        }
+        sma.push(sum / period);
+      }
+    }
+    return sma;
+  }
+
+  calculateBollinger(period = 20, multiplier = 2.0) {
+    const upper = [];
+    const lower = [];
+    const sma = this.calculateSMA(period);
+    for (let i = 0; i < this.candles.length; i++) {
+      if (sma[i] === null) {
+        upper.push(null);
+        lower.push(null);
+      } else {
+        let variance = 0;
+        for (let j = 0; j < period; j++) {
+          variance += Math.pow(this.candles[i - j].close - sma[i], 2);
+        }
+        const stdDev = Math.sqrt(variance / period);
+        upper.push(sma[i] + multiplier * stdDev);
+        lower.push(sma[i] - multiplier * stdDev);
+      }
+    }
+    return { upper, lower, sma };
+  }
+
+  calculateRSI(period = 14) {
+    const rsi = [];
+    if (this.candles.length < 2) return rsi;
+
+    let gains = 0;
+    let losses = 0;
+
+    for (let i = 0; i < this.candles.length; i++) {
+      if (i === 0) {
+        rsi.push(null);
+        continue;
+      }
+      const diff = this.candles[i].close - this.candles[i - 1].close;
+      const gain = diff > 0 ? diff : 0;
+      const loss = diff < 0 ? -diff : 0;
+
+      if (i < period) {
+        gains += gain;
+        losses += loss;
+        rsi.push(null);
+      } else if (i === period) {
+        gains += gain;
+        losses += loss;
+        const avgGain = gains / period;
+        const avgLoss = losses / period;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsi.push(100 - (100 / (1 + rs)));
+      } else {
+        const avgGain = (gains * (period - 1) + gain) / period;
+        const avgLoss = (losses * (period - 1) + loss) / period;
+        gains = avgGain;
+        losses = avgLoss;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        rsi.push(100 - (100 / (1 + rs)));
+      }
+    }
+    return rsi;
+  }
+
   aggregateCandles(rawCandles, interval) {
     if (!rawCandles || rawCandles.length === 0) return [];
     if (interval === '1M') return [...rawCandles];
 
     let groupSize = 5;
-    if (interval === '5M') groupSize = 5;
-    else if (interval === '15M') groupSize = 15;
-    else if (interval === '1H') groupSize = 30;
-    else if (interval === '1D') groupSize = 60;
+    if (interval === '15M') groupSize = 15;
+    else if (interval === '1H') groupSize = 60;
+    else if (interval === '1D') groupSize = 240;
 
     const aggregated = [];
     for (let i = 0; i < rawCandles.length; i += groupSize) {
-      const chunk = rawCandles.slice(i, i + groupSize);
-      if (chunk.length === 0) continue;
-      const first = chunk[0];
-      const last = chunk[chunk.length - 1];
+      const slice = rawCandles.slice(i, i + groupSize);
+      if (slice.length === 0) continue;
+
       let high = -Infinity;
       let low = Infinity;
-      let totalVol = 0;
-      for (const c of chunk) {
-        if (c.high > high) high = c.high;
-        if (c.low < low) low = c.low;
-        totalVol += (c.volume || 0);
+      let volume = 0;
+
+      for (const bar of slice) {
+        if (bar.high > high) high = bar.high;
+        if (bar.low < low) low = bar.low;
+        volume += (bar.volume || 0);
       }
+
       aggregated.push({
-        time: first.time,
-        open: first.open,
+        time: slice[0].time,
+        open: slice[0].open,
         high: high,
         low: low,
-        close: last.close,
-        volume: totalVol
+        close: slice[slice.length - 1].close,
+        volume: volume
       });
     }
     return aggregated;
@@ -154,7 +249,6 @@ class PriceChart {
     this.currentPrice = price;
     if (this.rawCandles && this.rawCandles.length > 0) {
       const last = this.rawCandles[this.rawCandles.length - 1];
-      // Defensive outlier guard: prevent mismatched cross-asset ticks from distorting the candle
       const refPrice = last.close || last.open;
       if (refPrice > 0 && Math.abs(price - refPrice) / refPrice > 0.35) {
         return;
@@ -195,7 +289,13 @@ class PriceChart {
     const marginBottom = 25;
     const marginTop = 24;
     const plotWidth = this.width - marginRight;
-    const plotHeight = this.height - marginBottom - marginTop;
+    const totalPlotHeight = this.height - marginBottom - marginTop;
+
+    // Allocate height if RSI is enabled
+    const rsiActive = this.indicators.RSI;
+    const rsiHeight = rsiActive ? Math.max(45, Math.floor(totalPlotHeight * 0.25)) : 0;
+    const pricePlotHeight = rsiActive ? (totalPlotHeight - rsiHeight - 12) : totalPlotHeight;
+    const rsiTop = marginTop + pricePlotHeight + 12;
 
     // Calculate High / Low range
     let minPrice = Infinity;
@@ -218,8 +318,8 @@ class PriceChart {
     minPrice -= range * 0.05;
     maxPrice += range * 0.05;
 
-    const priceToY = (p) => marginTop + plotHeight - ((p - minPrice) / (maxPrice - minPrice)) * plotHeight;
-    const yToPrice = (y) => maxPrice - ((y - marginTop) / plotHeight) * (maxPrice - minPrice);
+    const priceToY = (p) => marginTop + pricePlotHeight - ((p - minPrice) / (maxPrice - minPrice)) * pricePlotHeight;
+    const yToPrice = (y) => maxPrice - ((y - marginTop) / pricePlotHeight) * (maxPrice - minPrice);
 
     // Draw Grid Lines & Price Axis
     ctx.strokeStyle = '#1e1a0d';
@@ -229,7 +329,7 @@ class PriceChart {
 
     const gridSteps = 5;
     for (let i = 0; i <= gridSteps; i++) {
-      const y = marginTop + (plotHeight / gridSteps) * i;
+      const y = marginTop + (pricePlotHeight / gridSteps) * i;
       const p = maxPrice - ((maxPrice - minPrice) / gridSteps) * i;
 
       ctx.beginPath();
@@ -253,6 +353,60 @@ class PriceChart {
     const maxPan = 20;
     this.panOffset = Math.max(minPan, Math.min(maxPan, this.panOffset));
 
+    // Bollinger Bands Calculation & Rendering
+    if (this.indicators.BOLL && this.candles.length >= 5) {
+      const bollPeriod = Math.min(20, this.candles.length);
+      const boll = this.calculateBollinger(bollPeriod, 2.0);
+
+      // Shaded area between upper and lower band
+      ctx.fillStyle = 'rgba(255, 176, 0, 0.07)';
+      ctx.beginPath();
+      let first = true;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (boll.upper[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = priceToY(boll.upper[i]);
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      for (let i = this.candles.length - 1; i >= 0; i--) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (boll.lower[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          ctx.lineTo(x, priceToY(boll.lower[i]));
+        }
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Draw upper and lower lines
+      ctx.strokeStyle = 'rgba(255, 176, 0, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+
+      ctx.beginPath();
+      first = true;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (boll.upper[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = priceToY(boll.upper[i]);
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+
+      ctx.beginPath();
+      first = true;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (boll.lower[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = priceToY(boll.lower[i]);
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     let hoveredCandle = null;
     let hoveredX = -1;
 
@@ -264,10 +418,10 @@ class PriceChart {
 
       const isUp = c.close >= c.open;
 
-      // Volume bar at bottom
-      const volHeight = maxVol > 0 ? (c.volume / maxVol) * (plotHeight * 0.22) : 0;
+      // Volume bar at bottom of price plot
+      const volHeight = maxVol > 0 ? (c.volume / maxVol) * (pricePlotHeight * 0.22) : 0;
       ctx.fillStyle = isUp ? 'rgba(0, 255, 102, 0.2)' : 'rgba(255, 51, 68, 0.2)';
-      ctx.fillRect(x, marginTop + plotHeight - volHeight, candleWidth, volHeight);
+      ctx.fillRect(x, marginTop + pricePlotHeight - volHeight, candleWidth, volHeight);
 
       // Candlestick Wick
       ctx.strokeStyle = isUp ? '#00ff66' : '#ff3344';
@@ -292,10 +446,109 @@ class PriceChart {
       }
     }
 
+    // SMA 20 Overlay Line (Cyan)
+    if (this.indicators.SMA20 && this.candles.length >= 5) {
+      const period = Math.min(20, this.candles.length);
+      const sma = this.calculateSMA(period);
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let first = true;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (sma[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = priceToY(sma[i]);
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+    }
+
+    // SMA 50 Overlay Line (Magenta)
+    if (this.indicators.SMA50 && this.candles.length >= 10) {
+      const period = Math.min(50, this.candles.length);
+      const sma = this.calculateSMA(period);
+      ctx.strokeStyle = '#ff00ea';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let first = true;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (sma[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = priceToY(sma[i]);
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+    }
+
+    // RSI Sub-Pane
+    if (rsiActive && rsiHeight > 0) {
+      const rsiValues = this.calculateRSI(14);
+      const rsiToY = (v) => rsiTop + rsiHeight - (v / 100) * rsiHeight;
+
+      // Background & Boundary
+      ctx.fillStyle = '#060606';
+      ctx.fillRect(0, rsiTop, plotWidth, rsiHeight);
+      ctx.strokeStyle = '#221800';
+      ctx.strokeRect(0, rsiTop, plotWidth, rsiHeight);
+
+      // 70 Line (Overbought)
+      ctx.strokeStyle = 'rgba(255, 51, 68, 0.4)';
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(0, rsiToY(70));
+      ctx.lineTo(plotWidth, rsiToY(70));
+      ctx.stroke();
+
+      // 30 Line (Oversold)
+      ctx.strokeStyle = 'rgba(0, 255, 102, 0.4)';
+      ctx.beginPath();
+      ctx.moveTo(0, rsiToY(30));
+      ctx.lineTo(plotWidth, rsiToY(30));
+      ctx.stroke();
+
+      // 50 Centerline
+      ctx.strokeStyle = 'rgba(153, 106, 0, 0.25)';
+      ctx.beginPath();
+      ctx.moveTo(0, rsiToY(50));
+      ctx.lineTo(plotWidth, rsiToY(50));
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // RSI Labels on Right Margin
+      ctx.font = '9px monospace';
+      ctx.fillStyle = '#ff3344';
+      ctx.fillText('70', plotWidth + 6, rsiToY(70) + 3);
+      ctx.fillStyle = '#00ff66';
+      ctx.fillText('30', plotWidth + 6, rsiToY(30) + 3);
+
+      // Draw RSI Curve
+      ctx.strokeStyle = '#ffb000';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      let first = true;
+      let latestRsi = 50.0;
+      for (let i = 0; i < this.candles.length; i++) {
+        const x = rightAlignOffset + i * totalCandleSpan + this.panOffset + candleWidth / 2;
+        if (rsiValues[i] !== null && x >= -10 && x <= plotWidth + 10) {
+          const y = rsiToY(rsiValues[i]);
+          latestRsi = rsiValues[i];
+          if (first) { ctx.moveTo(x, y); first = false; } else { ctx.lineTo(x, y); }
+        }
+      }
+      ctx.stroke();
+
+      // Live Badge
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = '#ffb000';
+      ctx.fillText(`RSI(14): ${latestRsi.toFixed(1)}`, 8, rsiTop + 12);
+    }
+
     // Current Price Dashed Reference Line
     if (this.currentPrice > 0) {
       const liveY = priceToY(this.currentPrice);
-      if (liveY >= marginTop && liveY <= marginTop + plotHeight) {
+      if (liveY >= marginTop && liveY <= marginTop + pricePlotHeight) {
         ctx.strokeStyle = '#ffb000';
         ctx.setLineDash([4, 2]);
         ctx.beginPath();
@@ -314,11 +567,10 @@ class PriceChart {
     }
 
     // Interactive Crosshair & Tooltip HUD
-    if (this.mouse.active && this.mouse.x <= plotWidth && this.mouse.y >= marginTop && this.mouse.y <= marginTop + plotHeight) {
+    if (this.mouse.active && this.mouse.x <= plotWidth && this.mouse.y >= marginTop && this.mouse.y <= marginTop + totalPlotHeight) {
       const crossX = hoveredX > 0 ? hoveredX : this.mouse.x;
       const crossY = this.mouse.y;
 
-      // Crosshair lines
       ctx.strokeStyle = 'rgba(255, 176, 0, 0.45)';
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 3]);
@@ -326,23 +578,27 @@ class PriceChart {
       // Vertical line
       ctx.beginPath();
       ctx.moveTo(crossX, marginTop);
-      ctx.lineTo(crossX, marginTop + plotHeight);
+      ctx.lineTo(crossX, marginTop + totalPlotHeight);
       ctx.stroke();
 
       // Horizontal line
-      ctx.beginPath();
-      ctx.moveTo(0, crossY);
-      ctx.lineTo(plotWidth, crossY);
-      ctx.stroke();
+      if (crossY <= marginTop + pricePlotHeight) {
+        ctx.beginPath();
+        ctx.moveTo(0, crossY);
+        ctx.lineTo(plotWidth, crossY);
+        ctx.stroke();
+      }
       ctx.setLineDash([]);
 
       // Price indicator on Y-axis
-      const hoverPrice = yToPrice(crossY);
-      ctx.fillStyle = '#ffcc00';
-      ctx.fillRect(plotWidth, crossY - 8, marginRight, 16);
-      ctx.fillStyle = '#000000';
-      ctx.font = 'bold 9px monospace';
-      ctx.fillText(hoverPrice.toFixed(2), plotWidth + 4, crossY + 4);
+      if (crossY <= marginTop + pricePlotHeight) {
+        const hoverPrice = yToPrice(crossY);
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillRect(plotWidth, crossY - 8, marginRight, 16);
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 9px monospace';
+        ctx.fillText(hoverPrice.toFixed(2), plotWidth + 4, crossY + 4);
+      }
 
       // Top HUD Bar showing candle metrics
       if (hoveredCandle) {
@@ -402,11 +658,16 @@ class PriceChart {
 
       ctx.font = 'bold 11px monospace';
       ctx.fillStyle = '#ffb000';
-      ctx.fillText(`${this.symbol} [${this.interval}] INTRADAY CANDLESTICK ACTION (60 FPS)`, 8, 16);
+      let title = `${this.symbol} [${this.interval}] INTRADAY ACTION (60 FPS)`;
+      const activeInds = Object.keys(this.indicators).filter(k => this.indicators[k]);
+      if (activeInds.length > 0) {
+        title += ` // ${activeInds.join(', ')}`;
+      }
+      ctx.fillText(title, 8, 16);
 
       ctx.font = '10px monospace';
       ctx.fillStyle = '#888';
-      ctx.fillText('DOUBLE-CLICK TO RESET ZOOM / DRAG TO PAN', plotWidth - 250, 16);
+      ctx.fillText('DOUBLE-CLICK RESET / DRAG PAN', plotWidth - 200, 16);
     }
   }
 }

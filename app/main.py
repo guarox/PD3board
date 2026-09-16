@@ -21,6 +21,7 @@ from app.feeds.equities import EquitiesFeed
 from app.feeds.news import NewsFeed
 from app.feeds.yield_curve import YieldCurveFeed
 from app.feeds.eco import EcoFeed
+from app.feeds.world_macro import WorldMacroFeed
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("pd3board")
@@ -40,6 +41,7 @@ equities_feed = EquitiesFeed()
 news_feed = NewsFeed()
 yield_curve_feed = YieldCurveFeed()
 eco_feed = EcoFeed()
+world_macro_feed = WorldMacroFeed()
 
 # Global In-Memory State
 orderbooks: Dict[str, OrderBook] = {
@@ -298,6 +300,20 @@ async def execute_command(req: CommandRequest):
         data = yield_curve_feed.get_curve()
     elif fn == "DES":
         data = equities_feed.get_security_description(ticker)
+    elif fn == "ANR":
+        data = equities_feed.get_analyst_recommendations(ticker)
+    elif fn == "FA":
+        data = equities_feed.get_financial_analysis(ticker)
+    elif fn == "RV":
+        data = equities_feed.get_relative_valuation(ticker)
+    elif fn == "EE":
+        data = equities_feed.get_earnings_estimates(ticker)
+    elif fn == "WIRP":
+        data = world_macro_feed.get_wirp()
+    elif fn == "WCRS":
+        data = {"currencies": world_macro_feed.get_wcrs()}
+    elif fn == "FDM":
+        data = {"commodities": world_macro_feed.get_fdm()}
     elif fn == "ECO":
         data = {"events": eco_feed.get_events()}
     elif fn == "HELP":
@@ -307,6 +323,13 @@ async def execute_command(req: CommandRequest):
                 {"mnemonic": "L2", "desc": "Level 2 Order Book Depth Ladder with Spread in BPS"},
                 {"mnemonic": "WEI", "desc": "World Equity Indices & Macro Rates (SPX, NDX, DJI, etc.)"},
                 {"mnemonic": "DES", "desc": "Security Description, Fundamentals & Capital Structure"},
+                {"mnemonic": "ANR", "desc": "Analyst Recommendations, Price Targets & Wall St Consensus"},
+                {"mnemonic": "FA", "desc": "Financial Analysis 5-Year Statements (Income, Balance, Cash Flow)"},
+                {"mnemonic": "RV", "desc": "Relative Valuation Peer Comparison Matrix (Multiples & Ratios)"},
+                {"mnemonic": "EE", "desc": "Earnings & Estimates (Quarterly Surprises & Forward Guidance)"},
+                {"mnemonic": "WIRP", "desc": "World Interest Rate Probabilities (FOMC Rate Hike/Cut Probabilities)"},
+                {"mnemonic": "WCRS", "desc": "World Currency Ranker (Global FX Performance vs USD)"},
+                {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
                 {"mnemonic": "TOP", "desc": "Top Financial Market News Wire with Ticker Tagging"},
                 {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve (1M to 30Y)"},
                 {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"}
@@ -339,6 +362,34 @@ async def get_eco():
 async def get_des(symbol: str):
     return equities_feed.get_security_description(symbol)
 
+@app.get("/api/anr/{symbol}")
+async def get_anr(symbol: str):
+    return equities_feed.get_analyst_recommendations(symbol)
+
+@app.get("/api/fa/{symbol}")
+async def get_fa(symbol: str):
+    return equities_feed.get_financial_analysis(symbol)
+
+@app.get("/api/rv/{symbol}")
+async def get_rv(symbol: str):
+    return equities_feed.get_relative_valuation(symbol)
+
+@app.get("/api/ee/{symbol}")
+async def get_ee(symbol: str):
+    return equities_feed.get_earnings_estimates(symbol)
+
+@app.get("/api/wirp")
+async def get_wirp():
+    return world_macro_feed.get_wirp()
+
+@app.get("/api/wcrs")
+async def get_wcrs():
+    return world_macro_feed.get_wcrs()
+
+@app.get("/api/fdm")
+async def get_fdm():
+    return world_macro_feed.get_fdm()
+
 @app.get("/api/help")
 async def get_help():
     return {
@@ -347,6 +398,13 @@ async def get_help():
             {"mnemonic": "L2", "desc": "Level 2 Order Book Depth Ladder with Spread in BPS"},
             {"mnemonic": "WEI", "desc": "World Equity Indices & Macro Rates (SPX, NDX, DJI, etc.)"},
             {"mnemonic": "DES", "desc": "Security Description, Fundamentals & Capital Structure"},
+            {"mnemonic": "ANR", "desc": "Analyst Recommendations, Price Targets & Wall St Consensus"},
+            {"mnemonic": "FA", "desc": "Financial Analysis 5-Year Statements (Income, Balance, Cash Flow)"},
+            {"mnemonic": "RV", "desc": "Relative Valuation Peer Comparison Matrix (Multiples & Ratios)"},
+            {"mnemonic": "EE", "desc": "Earnings & Estimates (Quarterly Surprises & Forward Guidance)"},
+            {"mnemonic": "WIRP", "desc": "World Interest Rate Probabilities (FOMC Rate Hike/Cut Probabilities)"},
+            {"mnemonic": "WCRS", "desc": "World Currency Ranker (Global FX Performance vs USD)"},
+            {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
             {"mnemonic": "TOP", "desc": "Top Financial Market News Wire with Ticker Tagging"},
             {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve (1M to 30Y)"},
             {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"}
@@ -354,9 +412,10 @@ async def get_help():
         "sectors": ["EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"],
         "shortcuts": [
             {"key": "/", "action": "Focus Bloomberg command line"},
-            {"key": "Esc", "action": "Clear command input buffer"},
+            {"key": "Up / Down", "action": "Recall previous/next executed commands"},
+            {"key": "Esc", "action": "Clear command input buffer or close modal"},
             {"key": "<GO>", "action": "Execute entered command"},
-            {"key": "<CNCL>", "action": "Cancel current command input"}
+            {"key": "<CNCL>", "action": "Cancel current command input or dismiss modal"}
         ]
     }
 
