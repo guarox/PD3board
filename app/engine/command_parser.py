@@ -2,7 +2,17 @@ import re
 from typing import Dict, Any, Optional
 
 SECTORS = {"EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"}
-FUNCTIONS = {"GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM"}
+FUNCTIONS = {
+    "GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP",
+    "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM",
+    "OMON", "MAPS", "HEAT", "AI", "RES", "INSD", "HDS"
+}
+
+# Aliases
+FUNCTION_ALIASES = {
+    "HEAT": "MAPS",
+    "RES": "AI"
+}
 
 class CommandParser:
     """
@@ -25,13 +35,15 @@ class CommandParser:
         if not tokens:
             return {"valid": False, "error": "No tokens found"}
 
-        # Check for standalone functions (e.g. WEI, TOP, YCRV, ECO, HELP)
+        # Check for standalone functions (e.g. WEI, TOP, YCRV, ECO, HELP, MAPS, HEAT, WIRP, WCRS, FDM)
         if len(tokens) == 1 and tokens[0] in FUNCTIONS:
+            fn = tokens[0]
+            fn = FUNCTION_ALIASES.get(fn, fn)
             return {
                 "valid": True,
                 "ticker": None,
                 "sector": None,
-                "function": tokens[0],
+                "function": fn,
                 "raw": raw_command
             }
 
@@ -44,7 +56,7 @@ class CommandParser:
             if token in SECTORS:
                 sector = token
             elif token in FUNCTIONS:
-                function = token
+                function = FUNCTION_ALIASES.get(token, token)
 
         # Infer sector if omitted
         if not sector:

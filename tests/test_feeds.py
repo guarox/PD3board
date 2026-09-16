@@ -126,3 +126,58 @@ def test_index_security_price_and_des():
     assert "benchmark" in spx_des["description"].lower() or "benchmark" in spx_des["name"].lower()
     assert spx_des["exchange"] == "CBOE / NYSE / NASDAQ"
 
+def test_options_feed():
+    from app.feeds.options import OptionsFeed
+    feed = OptionsFeed()
+    omon = feed.get_options_chain("SPX")
+    assert omon["symbol"] == "SPX"
+    assert omon["spot_price"] > 5000
+    assert "chain" in omon
+    assert len(omon["chain"]) >= 7
+    assert omon["max_pain_strike"] > 0
+    # verify Greeks are calculated and populated
+    atm_row = [r for r in omon["chain"] if r["is_atm"]][0]
+    assert 0.4 <= atm_row["call_delta"] <= 0.6
+    assert -0.6 <= atm_row["put_delta"] <= -0.4
+    assert atm_row["call_gamma"] > 0
+    assert atm_row["call_vega"] > 0
+
+def test_market_heatmap_feed():
+    from app.feeds.market_heatmap import MarketHeatmapFeed
+    feed = MarketHeatmapFeed()
+    heatmap = feed.get_sp500_heatmap()
+    assert heatmap["index"] == "S&P 500"
+    assert heatmap["total_symbols"] >= 20
+    assert len(heatmap["sectors"]) >= 6
+    tech_sector = [s for s in heatmap["sectors"] if "tech" in s["sector"].lower()][0]
+    assert len(tech_sector["constituents"]) >= 4
+    symbols = [c["symbol"] for c in tech_sector["constituents"]]
+    assert "AAPL" in symbols
+    assert "NVDA" in symbols
+
+def test_insider_holdings_feed():
+    from app.feeds.insider_holdings import InsiderHoldingsFeed
+    feed = InsiderHoldingsFeed()
+    insd = feed.get_insider_transactions("AAPL")
+    assert insd["symbol"] == "AAPL"
+    assert len(insd["transactions"]) >= 3
+    assert "sentiment" in insd
+
+    hds = feed.get_institutional_holders("AAPL")
+    assert hds["symbol"] == "AAPL"
+    assert len(hds["holders"]) >= 5
+    assert hds["holders"][0]["rank"] == 1
+    assert "Vanguard" in hds["holders"][0]["name"] or "BlackRock" in hds["holders"][0]["name"]
+
+def test_ai_research_feed():
+    from app.feeds.ai_research import AIResearchFeed
+    feed = AIResearchFeed()
+    memo = feed.generate_research_memo("NVDA")
+    assert memo["symbol"] == "NVDA"
+    assert "rating" in memo
+    assert memo["target_price"] > memo["spot_price"]
+    assert len(memo["competitive_moat"]) >= 3
+    assert len(memo["growth_catalysts"]) >= 3
+    assert len(memo["downside_risks"]) >= 3
+    assert "fwd_pe" in memo["valuation_assessment"]
+
