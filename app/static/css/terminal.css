@@ -1,0 +1,371 @@
+/*
+ * PD3board: Authentic Bloomberg Professional Service Terminal Stylesheet
+ * Strict Amber Phosphor Palette, Monospace Tabular Figures, Flashing Ticks
+ */
+
+:root {
+  --bg-pitch-black: #070707;
+  --bg-panel: #111111;
+  --bg-panel-header: #1a1a1a;
+  --border-amber: #443200;
+  --border-subtle: #222222;
+  
+  --amber-primary: #ffb000;
+  --amber-bright: #ffcc00;
+  --amber-muted: #996a00;
+  --amber-dark: #332300;
+  
+  --bloomberg-orange: #ff8800;
+  --bloomberg-yellow: #e6b800;
+  --bloomberg-green: #00ff66;
+  --bloomberg-red: #ff3344;
+  --bloomberg-blue: #00bbff;
+  --text-white: #e0e0e0;
+  --text-muted: #888888;
+
+  --font-mono: 'Berkeley Mono', 'JetBrains Mono', 'IBM Plex Mono', 'Cascadia Code', Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-pitch-black);
+  color: var(--amber-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.4;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+/* CRT Scanline Overlay */
+.crt-overlay {
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%);
+  background-size: 100% 4px;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* Terminal Header */
+.terminal-header {
+  background: #000000;
+  border-bottom: 2px solid var(--amber-primary);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 12px;
+  background: #0d0d0d;
+  border-bottom: 1px solid var(--border-amber);
+  font-size: 11px;
+}
+
+.brand-badge {
+  color: #000000;
+  background: var(--amber-primary);
+  font-weight: bold;
+  padding: 1px 6px;
+  letter-spacing: 1px;
+}
+
+.status-cluster {
+  display: flex;
+  gap: 16px;
+  color: var(--text-muted);
+}
+
+.status-item span {
+  color: var(--amber-bright);
+}
+
+/* Bloomberg Command Line */
+.command-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #141414;
+}
+
+.cmd-prefix {
+  color: var(--bloomberg-green);
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.cmd-input {
+  flex: 1;
+  background: #000000;
+  border: 1px solid var(--amber-muted);
+  color: var(--amber-bright);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  padding: 4px 10px;
+  outline: none;
+  text-transform: uppercase;
+}
+
+.cmd-input:focus {
+  border-color: var(--amber-primary);
+  box-shadow: 0 0 5px rgba(255, 176, 0, 0.4);
+}
+
+.btn-key {
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: bold;
+  border: 1px solid #333;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.key-sector {
+  background: #2a2200;
+  color: var(--bloomberg-yellow);
+  border-color: #665200;
+}
+
+.key-sector:hover {
+  background: #443700;
+}
+
+.key-go {
+  background: #00441b;
+  color: #00ff66;
+  border-color: #008833;
+}
+
+.key-cancel {
+  background: #44000b;
+  color: #ff4455;
+  border-color: #880011;
+}
+
+/* Function Bar */
+.function-bar {
+  display: flex;
+  gap: 6px;
+  padding: 3px 12px;
+  background: #0a0a0a;
+  border-top: 1px solid #1f1f1f;
+  font-size: 11px;
+}
+
+.fn-tab {
+  padding: 2px 8px;
+  background: #161616;
+  color: var(--text-muted);
+  border: 1px solid #282828;
+  cursor: pointer;
+}
+
+.fn-tab.active {
+  background: var(--amber-dark);
+  color: var(--amber-bright);
+  border-color: var(--amber-primary);
+  font-weight: bold;
+}
+
+/* 4-Quadrant Workspace Grid */
+.workspace-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 2px;
+  background: #000000;
+  padding: 2px;
+  overflow: hidden;
+}
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-amber);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.panel-header {
+  background: var(--bg-panel-header);
+  border-bottom: 1px solid var(--border-amber);
+  padding: 4px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}
+
+.panel-title {
+  color: var(--amber-bright);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  background: var(--amber-primary);
+  color: #000000;
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
+.panel-body {
+  flex: 1;
+  padding: 6px;
+  overflow: auto;
+  position: relative;
+}
+
+/* Tables & Grids */
+table.terminal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+table.terminal-table th {
+  text-align: left;
+  padding: 4px 6px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-amber);
+  font-weight: normal;
+  font-size: 11px;
+}
+
+table.terminal-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid #1c1c1c;
+}
+
+.text-right { text-align: right; }
+.text-left { text-align: left; }
+.text-center { text-align: center; }
+
+/* Flashing Tick Colors */
+.tick-up {
+  color: var(--bloomberg-green) !important;
+  background-color: rgba(0, 255, 102, 0.15);
+  transition: background-color 0.4s ease;
+}
+
+.tick-down {
+  color: var(--bloomberg-red) !important;
+  background-color: rgba(255, 51, 68, 0.15);
+  transition: background-color 0.4s ease;
+}
+
+.pos { color: var(--bloomberg-green); }
+.neg { color: var(--bloomberg-red); }
+.neu { color: var(--text-muted); }
+
+/* Order Book Ladder */
+.depth-ladder {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  font-size: 11px;
+}
+
+.depth-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 4px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-amber);
+}
+
+.depth-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 2px 4px;
+  position: relative;
+  font-size: 11px;
+}
+
+.depth-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.depth-bar-bid { right: 0; background-color: var(--bloomberg-green); }
+.depth-bar-ask { left: 0; background-color: var(--bloomberg-red); }
+
+.spread-row {
+  text-align: center;
+  padding: 4px;
+  background: #161616;
+  border-top: 1px solid #282828;
+  border-bottom: 1px solid #282828;
+  color: var(--amber-bright);
+  font-weight: bold;
+}
+
+/* News List */
+.news-item {
+  padding: 6px 4px;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.news-time { color: var(--text-muted); font-size: 10px; width: 55px; flex-shrink: 0; }
+.news-ticker { color: var(--amber-bright); font-weight: bold; width: 50px; flex-shrink: 0; }
+.news-headline { color: var(--text-white); font-size: 11px; flex: 1; }
+.news-tag { font-size: 9px; padding: 1px 4px; border: 1px solid #333; }
+
+/* Canvas Chart */
+.chart-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+canvas#priceCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Footer Status Bar */
+.terminal-footer {
+  background: #000000;
+  border-top: 1px solid var(--border-amber);
+  padding: 4px 12px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.footer-cluster {
+  display: flex;
+  gap: 16px;
+}

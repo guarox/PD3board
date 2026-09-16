@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PD3board - Financial Workstation</title>
+  <link rel="stylesheet" href="/static/css/terminal.css">
+</head>
+<body>
+  <div class="crt-overlay"></div>
+
+  <!-- Terminal Header -->
+  <header class="terminal-header">
+    <div class="top-bar">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="brand-badge">PD3BOARD</span>
+        <span style="color: var(--amber-muted);">PROFESSIONAL SERVICE EMULATOR</span>
+      </div>
+      <div class="status-cluster">
+        <div class="status-item">SECURITY: <span id="activeSymbol">BTCUSDT CRNCY</span></div>
+        <div class="status-item">LAST: <span id="livePrice">--</span></div>
+        <div class="status-item"><span id="liveClock">13:30:00 EST</span></div>
+      </div>
+    </div>
+
+    <!-- Bloomberg Command Line -->
+    <div class="command-bar">
+      <span class="cmd-prefix">&gt;</span>
+      <input type="text" id="cmdInput" class="cmd-input" placeholder="ENTER TICKER / MNEMONIC (E.G. AAPL US EQUITY GP <GO>)" autofocus spellcheck="false" autocomplete="off">
+      <div style="display: flex; gap: 4px;">
+        <button class="btn-key key-sector" data-action="sector" data-val="EQUITY">EQUITY</button>
+        <button class="btn-key key-sector" data-action="sector" data-val="CRNCY">CRNCY</button>
+        <button class="btn-key key-sector" data-action="sector" data-val="INDEX">INDEX</button>
+        <button class="btn-key key-sector" data-action="sector" data-val="GOVT">GOVT</button>
+        <button class="btn-key key-go" data-action="go">&lt;GO&gt;</button>
+        <button class="btn-key key-cancel" data-action="cancel">&lt;CNCL&gt;</button>
+      </div>
+    </div>
+
+    <!-- Function Bar -->
+    <div class="function-bar">
+      <div class="fn-tab active" data-fn="GP">GP (CHART)</div>
+      <div class="fn-tab" data-fn="L2">L2 (DEPTH)</div>
+      <div class="fn-tab" data-fn="WEI">WEI (INDICES)</div>
+      <div class="fn-tab" data-fn="TOP">TOP (NEWS)</div>
+      <div class="fn-tab" data-fn="YCRV">YCRV (YIELDS)</div>
+      <div class="fn-tab" data-fn="DES">DES (DESCRIPTION)</div>
+    </div>
+  </header>
+
+  <!-- 4-Quadrant Workspace Grid -->
+  <main class="workspace-grid">
+    <!-- Pane 1: Price Action & Intraday Chart (GP) -->
+    <div class="panel" id="panelChart">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="badge">GP</span>
+          <span>GRAPHICAL PRICE ACTION (60 FPS CANVAS)</span>
+        </div>
+        <div class="neu" style="font-size: 10px;">INTRADAY 1M BARS</div>
+      </div>
+      <div class="panel-body" style="padding: 0;">
+        <div class="chart-container">
+          <canvas id="priceCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pane 2: Level 2 Order Book Depth Ladder (L2) -->
+    <div class="panel" id="panelOrderBook">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="badge">L2</span>
+          <span>LEVEL 2 ORDER BOOK DEPTH LADDER</span>
+        </div>
+        <div class="neu" style="font-size: 10px;">SUB-25MS FEED</div>
+      </div>
+      <div class="panel-body" id="orderbookContainer">
+        <div class="neu" style="padding: 10px;">Connecting to market depth stream...</div>
+      </div>
+    </div>
+
+    <!-- Pane 3: World Equity Indices (WEI) -->
+    <div class="panel" id="panelWEI">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="badge">WEI</span>
+          <span>WORLD EQUITY INDICES &amp; MACRO BENCHMARKS</span>
+        </div>
+        <div class="neu" style="font-size: 10px;">GLOBAL BENCHMARKS</div>
+      </div>
+      <div class="panel-body">
+        <table class="terminal-table">
+          <thead>
+            <tr>
+              <th>SYMBOL</th>
+              <th>NAME</th>
+              <th class="text-right">PRICE</th>
+              <th class="text-right">NET CHG</th>
+              <th class="text-right">% CHG</th>
+            </tr>
+          </thead>
+          <tbody id="weiBody">
+            <tr><td colspan="5" class="neu text-center">Loading World Indices...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pane 4: News Wire & Yield Curve (TOP / YCRV) -->
+    <div class="panel" id="panelNews">
+      <div class="panel-header">
+        <div class="panel-title">
+          <span class="badge">TOP</span>
+          <span>BREAKING FINANCIAL NEWS &amp; YIELD CURVE</span>
+        </div>
+        <div class="neu" style="font-size: 10px;">REAL-TIME WIRE</div>
+      </div>
+      <div class="panel-body" style="display: flex; flex-direction: column; gap: 10px;">
+        <div id="yieldCurveData"></div>
+        <div style="border-top: 1px solid var(--border-amber); padding-top: 6px;">
+          <div style="font-size: 10px; color: var(--amber-muted); margin-bottom: 4px; font-weight: bold;">LIVE HEADLINE WIRE</div>
+          <div id="newsList"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Status Footer -->
+  <footer class="terminal-footer">
+    <div class="footer-cluster">
+      <div>MARKETS: <span class="pos">NYSE: OPEN</span> | <span class="pos">LSE: OPEN</span> | <span class="neu">TSE: CLOSED</span></div>
+      <div id="tickCounter">TICKS: 0</div>
+    </div>
+    <div class="footer-cluster">
+      <div id="wsLatency">WS: CONNECTING...</div>
+      <div>TERMINAL ID: <span style="color: var(--amber-bright);">PD3-TALOS-01</span></div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="/static/js/chart.js"></script>
+  <script src="/static/js/orderbook.js"></script>
+  <script src="/static/js/terminal.js"></script>
+</body>
+</html>
