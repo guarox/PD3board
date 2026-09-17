@@ -227,6 +227,12 @@ async def equities_broadcaster():
                     "data": equities_feed.get_market_sessions()
                 })
 
+            if broadcast_count % 30 == 0:
+                await broadcast({
+                    "type": "yield_curve",
+                    "data": yield_curve_feed.get_curve()
+                })
+
             updates = equities_feed.update_ticks()
             if updates:
                 await broadcast({
