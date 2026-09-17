@@ -268,7 +268,7 @@ class TerminalController {
         const res = await fetch('/api/market-status');
         if (res.ok) {
           const json = await res.json();
-          if (json.data) this.updateMarketStatus(json.data);
+          if (json.data) this.updateMarketStatus(json.data, json.terminal_id);
         }
       } catch (e) {}
     };
@@ -360,11 +360,15 @@ class TerminalController {
     } else if (msg.type === 'yield_curve') {
       this.renderYieldCurve(msg.data);
     } else if (msg.type === 'market_status') {
-      this.updateMarketStatus(msg.data);
+      this.updateMarketStatus(msg.data, msg.terminal_id);
     }
   }
 
-  updateMarketStatus(sessions) {
+  updateMarketStatus(sessions, terminalId = null) {
+    if (terminalId) {
+      const termEl = document.getElementById('terminalId');
+      if (termEl) termEl.innerText = terminalId;
+    }
     if (!sessions) return;
     this.marketSessions = sessions;
     const nyseEl = document.getElementById('mktNYSE');
