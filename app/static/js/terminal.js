@@ -362,9 +362,6 @@ class TerminalController {
         msg.data.forEach(t => {
           if (this.isTickerMatch(t.symbol, this.currentTicker)) {
             this.updateHeaderPrice(t.price, t.change >= 0 ? 'buy' : 'sell');
-            if (this.priceChart) {
-              this.priceChart.updateLiveTick(t.price, 100, t.timestamp);
-            }
           }
         });
       }

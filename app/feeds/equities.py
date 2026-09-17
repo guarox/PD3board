@@ -12,13 +12,21 @@ logger = logging.getLogger(__name__)
 
 SYMBOL_MAP = {
     "SPX": "^GSPC",
+    "^GSPC": "^GSPC",
     "NDX": "^IXIC",
+    "^IXIC": "^IXIC",
     "DJI": "^DJI",
+    "^DJI": "^DJI",
     "RUT": "^RUT",
+    "^RUT": "^RUT",
     "VIX": "^VIX",
+    "^VIX": "^VIX",
     "FTSE": "^FTSE",
+    "^FTSE": "^FTSE",
     "N225": "^N225",
+    "^N225": "^N225",
     "DAX": "^GDAXI",
+    "^GDAXI": "^GDAXI",
     "BTC": "BTC-USD",
     "BTCUSD": "BTC-USD",
     "BTCUSDT": "BTC-USD",
@@ -177,15 +185,16 @@ class EquitiesFeed:
     """
     def __init__(self):
         self.live_cache: Dict[str, Dict[str, Any]] = {}
+        self.simulated_prices: Dict[str, float] = {}
 
         self.indices: Dict[str, Dict[str, Any]] = {
-            "SPX": {"name": "S&P 500 INDEX", "price": 5625.80, "prev_close": 5595.75, "high": 5638.10, "low": 5588.20},
-            "NDX": {"name": "NASDAQ 100", "price": 19680.40, "prev_close": 19520.10, "high": 19740.00, "low": 19480.50},
-            "DJI": {"name": "DOW JONES INDUS.", "price": 41390.25, "prev_close": 41240.80, "high": 41450.00, "low": 41180.10},
-            "RUT": {"name": "RUSSELL 2000", "price": 2210.60, "prev_close": 2195.40, "high": 2225.00, "low": 2190.20},
-            "FTSE": {"name": "FTSE 100 INDEX", "price": 8280.15, "prev_close": 8245.50, "high": 8295.00, "low": 8230.00},
-            "N225": {"name": "NIKKEI 225", "price": 36580.00, "prev_close": 36210.00, "high": 36720.00, "low": 36150.00},
-            "DAX": {"name": "GERMAN DAX 40", "price": 18630.70, "prev_close": 18580.20, "high": 18680.00, "low": 18540.00},
+            "SPX": {"name": "S&P 500 INDEX", "price": 7636.00, "prev_close": 7615.00, "high": 7645.00, "low": 7605.00},
+            "NDX": {"name": "NASDAQ 100", "price": 26390.00, "prev_close": 26250.00, "high": 26450.00, "low": 26180.00},
+            "DJI": {"name": "DOW JONES INDUS.", "price": 51800.00, "prev_close": 51600.00, "high": 51920.00, "low": 51500.00},
+            "RUT": {"name": "RUSSELL 2000", "price": 2885.00, "prev_close": 2865.00, "high": 2895.00, "low": 2855.00},
+            "FTSE": {"name": "FTSE 100 INDEX", "price": 10815.00, "prev_close": 10760.00, "high": 10850.00, "low": 10720.00},
+            "N225": {"name": "NIKKEI 225", "price": 64135.00, "prev_close": 63800.00, "high": 64300.00, "low": 63600.00},
+            "DAX": {"name": "GERMAN DAX 40", "price": 25715.00, "prev_close": 25620.00, "high": 25800.00, "low": 25550.00},
         }
 
         self.equities: Dict[str, Dict[str, Any]] = {
@@ -490,12 +499,34 @@ class EquitiesFeed:
             if not self.is_symbol_market_open(symbol):
                 continue
 
+            # Target / anchor price from live quote or baseline
+            quote = self.live_cache.get(symbol, {}).get("data")
+            target_price = float(quote["price"]) if quote else float(data["price"])
+            prev_close = float(quote["prev_close"]) if quote else float(data["prev_close"])
+
+            # Initialize simulated price to target if not present or if drifted too far (>1.0%)
+            curr_sim = self.simulated_prices.get(symbol)
+            if curr_sim is None or abs(curr_sim - target_price) / target_price > 0.01:
+                curr_sim = target_price
+                self.simulated_prices[symbol] = curr_sim
+
             if random.random() < 0.4:
-                quote = self.live_cache.get(symbol, {}).get("data")
-                curr_price = quote["price"] if quote else data["price"]
-                prev_close = quote["prev_close"] if quote else data["prev_close"]
-                drift = (random.random() - 0.48) * (curr_price * 0.0004)
-                new_price = round(curr_price + drift, 2)
+                # Realistic minimum tick size based on asset price level
+                if target_price >= 10000:
+                    tick_size = 0.50
+                elif target_price >= 1000:
+                    tick_size = 0.10
+                elif target_price >= 100:
+                    tick_size = 0.02
+                else:
+                    tick_size = 0.01
+
+                # Continuous random walk with gentle mean-reversion toward target anchor
+                step_choice = random.choice([-1, 0, 1]) * tick_size
+                reversion = (target_price - curr_sim) * 0.03
+                new_price = round(curr_sim + step_choice + reversion, 2)
+                self.simulated_prices[symbol] = new_price
+
                 chg = round(new_price - prev_close, 2)
                 chg_pct = round((chg / prev_close) * 100, 2) if prev_close else 0.0
                 updated.append({
@@ -536,7 +567,7 @@ class EquitiesFeed:
             })
         return matrix
 
-    def get_security_price(self, symbol: str, prefer_live: bool = False) -> float:
+    def get_security_price(self, symbol: str, prefer_live: bool = True) -> float:
         sym = symbol.upper()
         if sym in PRIVATE_SECURITIES:
             return float(PRIVATE_SECURITIES[sym]["price"])
@@ -546,10 +577,10 @@ class EquitiesFeed:
             if quote and quote.get("price"):
                 return float(quote["price"])
 
-        if sym in self.equities:
-            return float(self.equities[sym]["price"])
         if sym in self.indices:
             return float(self.indices[sym]["price"])
+        if sym in self.equities:
+            return float(self.equities[sym]["price"])
 
         quote = self.fetch_live_quote(sym)
         if quote and quote.get("price"):
