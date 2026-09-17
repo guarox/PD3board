@@ -272,6 +272,30 @@ async def equities_broadcaster():
             logger.error(f"Error in equities broadcaster: {e}")
         await asyncio.sleep(1.0)
 
+async def news_broadcaster():
+    """Background task to poll live financial RSS news feeds and broadcast breaking items."""
+    try:
+        new_items = await news_feed.refresh_news()
+        if new_items and active_connections:
+            await broadcast({
+                "type": "news",
+                "data": news_feed.get_latest_news()
+            })
+    except Exception as e:
+        logger.error(f"Initial live news fetch error: {e}")
+
+    while True:
+        try:
+            await asyncio.sleep(45.0)  # Check for breaking news every 45 seconds
+            new_items = await news_feed.refresh_news()
+            if new_items and active_connections:
+                await broadcast({
+                    "type": "news",
+                    "data": news_feed.get_latest_news()
+                })
+        except Exception as e:
+            logger.error(f"Error in news broadcaster loop: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting PD3board feeds...")
@@ -281,6 +305,7 @@ async def startup_event():
     # Start Coinbase live feed (Binance passive in US IP environment)
     await coinbase_feed.start()
     asyncio.create_task(equities_broadcaster())
+    asyncio.create_task(news_broadcaster())
 
 @app.on_event("shutdown")
 async def shutdown_event():

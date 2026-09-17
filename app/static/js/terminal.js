@@ -355,8 +355,14 @@ class TerminalController {
         });
       }
     } else if (msg.type === 'news') {
+      const isNew = this.lastNewsHeadline && msg.data && msg.data[0] && msg.data[0].headline !== this.lastNewsHeadline;
       this.renderNews(msg.data);
-      this.sound.playChime();
+      if (isNew) {
+        this.sound.playChime();
+      }
+      if (msg.data && msg.data[0]) {
+        this.lastNewsHeadline = msg.data[0].headline;
+      }
     } else if (msg.type === 'yield_curve') {
       this.renderYieldCurve(msg.data);
     } else if (msg.type === 'market_status') {
@@ -1672,16 +1678,27 @@ class TerminalController {
     if (!list || !newsItems) return;
     let html = '';
     newsItems.forEach(n => {
+      const sentClass = n.sentiment === 'BULLISH' ? 'pos' : (n.sentiment === 'BEARISH' ? 'neg' : 'neu');
       html += `
-        <div class="news-item">
+        <div class="news-item" style="cursor: pointer;" data-ticker="${n.ticker}" title="Click to load ${n.ticker}">
           <div class="news-time">${n.time}</div>
           <div class="news-ticker">${n.ticker}</div>
           <div class="news-headline">${n.headline}</div>
-          <div class="news-tag neu">${n.source}</div>
+          <div class="news-tag ${sentClass}">${n.source}</div>
         </div>
       `;
     });
     list.innerHTML = html;
+
+    list.querySelectorAll('.news-item').forEach(el => {
+      el.addEventListener('click', () => {
+        const ticker = el.dataset.ticker;
+        if (ticker && ticker !== 'MARKET' && ticker !== 'US10Y') {
+          const sector = ticker.includes('USD') ? 'CRNCY' : 'EQUITY';
+          this.executeCommand(`${ticker} ${sector} GP <GO>`);
+        }
+      });
+    });
   }
 
   renderYieldCurve(curve) {
