@@ -282,11 +282,52 @@ class PriceChart {
     this.render();
   }
 
-  updateLiveTick(price, size) {
+  syncCandles(candles) {
+    if (!candles || candles.length === 0) return;
+    this.rawCandles = candles;
+    this.candles = this.aggregateCandles(this.rawCandles, this.interval);
+    this.render();
+  }
+
+  updateLiveTick(price, size, timestamp) {
     if (!price || isNaN(price)) return;
     this.currentPrice = price;
-    if (this.rawCandles && this.rawCandles.length > 0) {
-      const last = this.rawCandles[this.rawCandles.length - 1];
+
+    const ts = timestamp ? (timestamp > 1e11 ? Math.floor(timestamp / 1000) : Math.floor(timestamp)) : Math.floor(Date.now() / 1000);
+    const minuteBucket = Math.floor(ts / 60) * 60;
+
+    if (!this.rawCandles || this.rawCandles.length === 0) {
+      this.rawCandles = [{
+        time: minuteBucket,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume: size || 1
+      }];
+      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
+      this.render();
+      return;
+    }
+
+    const last = this.rawCandles[this.rawCandles.length - 1];
+    const lastTime = last.time || 0;
+    const lastBucket = lastTime > 1e11 ? Math.floor(lastTime / 1000 / 60) * 60 : Math.floor(lastTime / 60) * 60;
+
+    // Advance to next 1-minute candle bucket when minute boundary passes
+    if (minuteBucket > lastBucket && lastBucket > 0) {
+      this.rawCandles.push({
+        time: minuteBucket,
+        open: price,
+        high: price,
+        low: price,
+        close: price,
+        volume: size || 1
+      });
+      if (this.rawCandles.length > 120) {
+        this.rawCandles.shift();
+      }
+    } else {
       const refPrice = last.close || last.open;
       if (refPrice > 0 && Math.abs(price - refPrice) / refPrice > 0.35) {
         last.open = price;
@@ -298,15 +339,10 @@ class PriceChart {
         last.low = Math.min(last.low, price);
         last.close = price;
       }
-      last.volume += (size || 0);
-      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
-    } else if (this.candles.length > 0) {
-      const last = this.candles[this.candles.length - 1];
-      last.high = Math.max(last.high, price);
-      last.low = Math.min(last.low, price);
-      last.close = price;
-      last.volume += (size || 0);
+      last.volume = (last.volume || 0) + (size || 0);
     }
+
+    this.candles = this.aggregateCandles(this.rawCandles, this.interval);
     this.render();
   }
 
@@ -467,39 +503,82 @@ class PriceChart {
     let hoveredCandle = null;
     let hoveredX = -1;
 
-    // Draw Candles & Volume Bars
+    // Draw Candles, Volume Bars & Time Labels
     for (let i = 0; i < this.candles.length; i++) {
       const c = this.candles[i];
-      const x = rightAlignOffset + i * totalCandleSpan + this.panOffset;
-      if (x + candleWidth < 0 || x > plotWidth) continue;
+      const rawX = rightAlignOffset + i * totalCandleSpan + this.panOffset;
+      if (rawX + candleWidth < 0 || rawX > plotWidth) continue;
+
+      const candleX = Math.floor(rawX);
+      const cWidth = Math.max(2, Math.floor(candleWidth));
+      const wickX = candleX + Math.floor(cWidth / 2) + 0.5;
 
       const isUp = c.close >= c.open;
+      const candleColor = isUp ? '#00ff66' : '#ff3344';
+      const candleBorder = isUp ? '#00cc52' : '#cc2936';
 
-      // Volume bar at bottom of price plot
-      const volHeight = maxVol > 0 ? (c.volume / maxVol) * (pricePlotHeight * 0.22) : 0;
-      ctx.fillStyle = isUp ? 'rgba(0, 255, 102, 0.2)' : 'rgba(255, 51, 68, 0.2)';
-      ctx.fillRect(x, marginTop + pricePlotHeight - volHeight, candleWidth, volHeight);
+      // Subtle vertical grid line and time marking every 8-10 candles
+      const stepCandles = Math.max(6, Math.floor(75 / totalCandleSpan));
+      if (i % stepCandles === 0 && c.time) {
+        ctx.strokeStyle = '#181409';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(wickX, marginTop);
+        ctx.lineTo(wickX, marginTop + pricePlotHeight);
+        ctx.stroke();
 
-      // Candlestick Wick
-      ctx.strokeStyle = isUp ? '#00ff66' : '#ff3344';
+        const tsSec = c.time > 1e11 ? Math.floor(c.time / 1000) : Math.floor(c.time);
+        const d = new Date(tsSec * 1000);
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mm = String(d.getMinutes()).padStart(2, '0');
+        ctx.font = '9px monospace';
+        ctx.fillStyle = '#886200';
+        ctx.fillText(`${hh}:${mm}`, Math.max(0, Math.min(plotWidth - 30, wickX - 14)), marginTop + pricePlotHeight + 14);
+      }
+
+      // Scaled Volume bar at bottom of price plot
+      const volHeight = maxVol > 0 ? (c.volume / maxVol) * (pricePlotHeight * 0.18) : 0;
+      ctx.fillStyle = isUp ? 'rgba(0, 255, 102, 0.28)' : 'rgba(255, 51, 68, 0.28)';
+      ctx.fillRect(candleX, Math.floor(marginTop + pricePlotHeight - volHeight), cWidth, Math.ceil(volHeight));
+
+      // Pixel Y coordinates
+      const yHigh = Math.round(priceToY(c.high));
+      const yLow = Math.round(priceToY(c.low));
+      const yOpen = Math.round(priceToY(c.open));
+      const yClose = Math.round(priceToY(c.close));
+
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyBottom = Math.max(yOpen, yClose);
+      const bodyHeight = Math.max(bodyBottom - bodyTop, 1);
+
+      // Candlestick Wicks (Upper & Lower)
+      ctx.strokeStyle = candleColor;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(x + candleWidth / 2, priceToY(c.high));
-      ctx.lineTo(x + candleWidth / 2, priceToY(c.low));
+      if (yHigh < bodyTop) {
+        ctx.moveTo(wickX, yHigh);
+        ctx.lineTo(wickX, bodyTop);
+      }
+      if (yLow > bodyBottom) {
+        ctx.moveTo(wickX, bodyBottom);
+        ctx.lineTo(wickX, yLow);
+      }
       ctx.stroke();
 
       // Candlestick Body
-      const yOpen = priceToY(c.open);
-      const yClose = priceToY(c.close);
-      const bodyY = Math.min(yOpen, yClose);
-      const bodyH = Math.max(Math.abs(yClose - yOpen), 1);
+      ctx.fillStyle = candleColor;
+      ctx.fillRect(candleX, bodyTop, cWidth, bodyHeight);
 
-      ctx.fillStyle = isUp ? '#00ff66' : '#ff3344';
-      ctx.fillRect(x, bodyY, candleWidth, bodyH);
+      // Clean border outline if candle is wide enough
+      if (cWidth >= 5 && bodyHeight >= 3) {
+        ctx.strokeStyle = candleBorder;
+        ctx.strokeRect(candleX + 0.5, bodyTop + 0.5, cWidth - 1, bodyHeight - 1);
+      }
 
       // Check mouse hover
-      if (this.mouse.active && this.mouse.x >= x - gap / 2 && this.mouse.x <= x + candleWidth + gap / 2) {
+      if (this.mouse.active && this.mouse.x >= candleX - gap / 2 && this.mouse.x <= candleX + cWidth + gap / 2) {
         hoveredCandle = c;
-        hoveredX = x + candleWidth / 2;
+        hoveredX = wickX;
       }
     }
 
@@ -804,7 +883,18 @@ class PriceChart {
         ctx.fillStyle = '#888';
         ctx.fillText('VOL:', tx, 16); tx += 28;
         ctx.fillStyle = '#ffcc00';
-        ctx.fillText(Math.round(c.volume).toLocaleString(), tx, 16);
+        ctx.fillText(Math.round(c.volume).toLocaleString(), tx, 16); tx += 55;
+
+        if (c.time) {
+          const tsSec = c.time > 1e11 ? Math.floor(c.time / 1000) : Math.floor(c.time);
+          const d = new Date(tsSec * 1000);
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          ctx.fillStyle = '#888';
+          ctx.fillText('TIME:', tx, 16); tx += 32;
+          ctx.fillStyle = '#00e5ff';
+          ctx.fillText(`${hh}:${mm}`, tx, 16);
+        }
       }
     } else {
       // Default top info bar when not hovering

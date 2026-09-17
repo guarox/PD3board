@@ -53,6 +53,11 @@ class TickBuffer:
             c.close = price
             c.volume += size
 
+        if len(self.candles) > 300:
+            oldest_keys = sorted(self.candles.keys())[:-200]
+            for old_k in oldest_keys:
+                del self.candles[old_k]
+
         return tick
 
     def get_recent_ticks(self, count: int = 50) -> List[Dict[str, Any]]:
