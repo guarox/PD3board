@@ -63,6 +63,6 @@ class TickBuffer:
     def get_recent_ticks(self, count: int = 50) -> List[Dict[str, Any]]:
         return [asdict(t) for t in list(self.ticks)[-count:]]
 
-    def get_candles(self, limit: int = 60) -> List[Dict[str, Any]]:
+    def get_candles(self, limit: int = 180) -> List[Dict[str, Any]]:
         sorted_times = sorted(self.candles.keys())[-limit:]
         return [asdict(self.candles[t]) for t in sorted_times]

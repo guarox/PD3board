@@ -59,17 +59,15 @@ tick_buffers: Dict[str, TickBuffer] = {
     Config.DEFAULT_CRYPTO: TickBuffer(Config.DEFAULT_CRYPTO),
 }
 
-def get_or_create_tick_buffer(sym: str) -> TickBuffer:
+def sync_tick_buffer_with_real_candles(sym: str) -> TickBuffer:
     sym = sym.upper()
     if sym in tick_buffers:
         tb = tick_buffers[sym]
-        if tb.candles:
-            return tb
     else:
         tb = TickBuffer(sym)
         tick_buffers[sym] = tb
 
-    # 1. Try loading real historical 1-minute intraday candles
+    # Attempt to load real historical 1-minute intraday candles from upstream (e.g. Yahoo Finance)
     real_candles = equities_feed.get_historical_candles(sym)
     if real_candles:
         for c in real_candles:
@@ -88,18 +86,31 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
                 close=c_close,
                 volume=c_vol
             )
-            tb.ticks.append(Tick(timestamp=b_time + 10, price=c_open, size=max(1.0, c_vol * 0.25), side="buy"))
-            tb.ticks.append(Tick(timestamp=b_time + 25, price=c_high, size=max(1.0, c_vol * 0.25), side="buy"))
-            tb.ticks.append(Tick(timestamp=b_time + 40, price=c_low, size=max(1.0, c_vol * 0.25), side="sell"))
-            tb.ticks.append(Tick(timestamp=b_time + 55, price=c_close, size=max(1.0, c_vol * 0.25), side="buy" if c_close >= c_open else "sell"))
+        # Circular prune if exceeding 300 bars
+        if len(tb.candles) > 300:
+            oldest_keys = sorted(tb.candles.keys())[:-250]
+            for old_k in oldest_keys:
+                del tb.candles[old_k]
+
+    return tb
+
+def get_or_create_tick_buffer(sym: str) -> TickBuffer:
+    sym = sym.upper()
+    if sym in tick_buffers:
+        tb = tick_buffers[sym]
+        if tb.candles:
+            return tb
+
+    tb = sync_tick_buffer_with_real_candles(sym)
+    if tb.candles:
         return tb
 
-    # 2. Fallback to generating natural simulated historical candles around current security price
-    expected_price = equities_feed.get_security_price(sym)
+    # Fallback to generating natural simulated historical candles around current security price
+    expected_price = equities_feed.get_security_price(sym, prefer_live=True)
     base_price = expected_price if expected_price > 0 else 100.0
     now_ts = time.time()
     current_minute = int(now_ts // 60) * 60
-    step = max(0.02, round(base_price * 0.0006, 2))
+    step = max(0.01, round(base_price * 0.0003, 2))
 
     # Generate 60 realistic continuous minute candles ending at base_price
     # Walk backward from current minute so the final candle closes at base_price
@@ -110,18 +121,18 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
     for idx in range(60):
         minute_ts = current_minute - (59 - idx) * 60
         drift = (rng.random() - 0.49) * step
-        mean_reversion = (base_price - curr) * 0.08
+        mean_reversion = (base_price - curr) * 0.03
         next_val = round(curr + drift + mean_reversion, 2)
 
         c_open = curr
         c_close = next_val
         body_min = min(c_open, c_close)
         body_max = max(c_open, c_close)
-        wick_up = round(rng.uniform(0.05, 0.5) * step, 2)
-        wick_dn = round(rng.uniform(0.05, 0.5) * step, 2)
+        wick_up = round(rng.uniform(0.02, 0.15) * step, 2)
+        wick_dn = round(rng.uniform(0.02, 0.15) * step, 2)
         c_high = round(body_max + wick_up, 2)
         c_low = round(body_min - wick_dn, 2)
-        c_vol = round(rng.uniform(60.0, 450.0), 1)
+        c_vol = round(rng.uniform(200.0, 1500.0), 1)
 
         candles_list.append((minute_ts, c_open, c_high, c_low, c_close, c_vol))
         curr = next_val
@@ -564,9 +575,11 @@ async def get_market_status():
 async def get_ticks(symbol: str):
     sym = symbol.upper()
     tb = get_or_create_tick_buffer(sym)
+    if sym not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
+        sync_tick_buffer_with_real_candles(sym)
     return {
         "symbol": sym,
-        "candles": tb.get_candles(),
+        "candles": tb.get_candles(limit=180),
         "ticks": tb.get_recent_ticks()
     }
 

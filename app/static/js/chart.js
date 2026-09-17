@@ -406,10 +406,11 @@ class PriceChart {
       maxPrice = Math.max(maxPrice, this.currentPrice);
     }
 
-    // Padding (5% headroom and footroom)
-    const range = (maxPrice - minPrice) || 1.0;
-    minPrice -= range * 0.05;
-    maxPrice += range * 0.05;
+    // Padding (headroom and footroom with proportional minimum to avoid artificial vertical distortion on tight ranges)
+    const rawRange = (maxPrice - minPrice);
+    const minPadding = Math.max(rawRange * 0.06, (maxPrice * 0.0008) || 0.5);
+    minPrice -= minPadding;
+    maxPrice += minPadding;
 
     const priceToY = (p) => marginTop + pricePlotHeight - ((p - minPrice) / (maxPrice - minPrice)) * pricePlotHeight;
     const yToPrice = (y) => maxPrice - ((y - marginTop) / pricePlotHeight) * (maxPrice - minPrice);

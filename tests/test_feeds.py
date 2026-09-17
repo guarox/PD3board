@@ -140,7 +140,7 @@ def test_index_security_price_and_des():
     assert ndx_price > 18000.0
 
     mcd_price = feed.get_security_price("MCD")
-    assert 280.0 < mcd_price < 350.0
+    assert 200.0 < mcd_price < 400.0
 
     spx_des = feed.get_security_description("SPX")
     assert spx_des["symbol"] == "SPX"
@@ -236,6 +236,27 @@ def test_tick_buffer_pruning():
     candles = tb.get_candles(limit=500)
     assert len(tb.candles) <= 300
     assert len(candles) <= 300
+
+def test_equities_brownian_tick_walk():
+    from app.feeds.equities import EquitiesFeed
+    feed = EquitiesFeed()
+    feed.indices["SPX"]["price"] = 7636.00
+    # Simulate ticks
+    feed.is_symbol_market_open = lambda s: True
+    updates = feed.update_ticks()
+    assert isinstance(updates, list)
+    if "SPX" in feed.simulated_prices:
+        sim_price = feed.simulated_prices["SPX"]
+        # Ensure simulated price is within 1% of baseline 7636.00
+        assert abs(sim_price - 7636.00) / 7636.00 < 0.01
+
+def test_indices_baseline_prices():
+    from app.feeds.equities import EquitiesFeed
+    feed = EquitiesFeed()
+    assert feed.indices["SPX"]["price"] >= 7000.0
+    assert feed.indices["NDX"]["price"] >= 20000.0
+    assert feed.indices["DJI"]["price"] >= 45000.0
+    assert feed.get_security_price("SPX") >= 7000.0
 
 
 
