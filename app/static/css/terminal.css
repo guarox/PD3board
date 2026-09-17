@@ -328,6 +328,7 @@ table.table-data td {
 .pos { color: var(--bloomberg-green); }
 .neg { color: var(--bloomberg-red); }
 .neu { color: var(--text-muted); }
+.cyan { color: var(--bloomberg-blue); }
 
 /* Order Book Ladder */
 .depth-ladder {

@@ -83,10 +83,12 @@ class TerminalController {
 
     this.priceChart = null;
     this.orderBookUI = null;
+    this.marketSessions = { NYSE: 'CLOSED', LSE: 'CLOSED', TSE: 'OPEN', CRNCY: 'OPEN' };
 
     this.initUI();
     this.initWebSocket();
     this.initClock();
+    this.updateMarketStatus(this.marketSessions);
   }
 
   initUI() {
@@ -260,6 +262,18 @@ class TerminalController {
     };
     updateTime();
     setInterval(updateTime, 1000);
+
+    const fetchMarketStatus = async () => {
+      try {
+        const res = await fetch('/api/market-status');
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data) this.updateMarketStatus(json.data);
+        }
+      } catch (e) {}
+    };
+    fetchMarketStatus();
+    setInterval(fetchMarketStatus, 30000);
   }
 
   initWebSocket() {
@@ -345,7 +359,67 @@ class TerminalController {
       this.sound.playChime();
     } else if (msg.type === 'yield_curve') {
       this.renderYieldCurve(msg.data);
+    } else if (msg.type === 'market_status') {
+      this.updateMarketStatus(msg.data);
     }
+  }
+
+  updateMarketStatus(sessions) {
+    if (!sessions) return;
+    this.marketSessions = sessions;
+    const nyseEl = document.getElementById('mktNYSE');
+    const lseEl = document.getElementById('mktLSE');
+    const tseEl = document.getElementById('mktTSE');
+    const crncyEl = document.getElementById('mktCRNCY');
+
+    const setStatusClass = (el, text, status) => {
+      if (!el) return;
+      el.innerText = text;
+      if (status === 'OPEN') {
+        el.className = 'pos';
+      } else if (status === 'AFTER-HOURS' || status === 'PRE-MARKET' || status === 'LUNCH') {
+        el.className = 'cyan';
+      } else {
+        el.className = 'neu';
+      }
+    };
+
+    if (nyseEl && sessions.NYSE) setStatusClass(nyseEl, `NYSE: ${sessions.NYSE}`, sessions.NYSE);
+    if (lseEl && sessions.LSE) setStatusClass(lseEl, `LSE: ${sessions.LSE}`, sessions.LSE);
+    if (tseEl && sessions.TSE) setStatusClass(tseEl, `TSE: ${sessions.TSE}`, sessions.TSE);
+    if (crncyEl) setStatusClass(crncyEl, 'CRYPTO: 24/7', 'OPEN');
+
+    this.updateActiveSecurityBadge();
+  }
+
+  updateActiveSecurityBadge() {
+    const symbolBadge = document.getElementById('activeSymbol');
+    if (!symbolBadge) return;
+    const ticker = this.currentTicker ? this.currentTicker.toUpperCase() : 'BTCUSDT';
+    const sector = this.currentSector ? this.currentSector.toUpperCase() : 'CRNCY';
+
+    let statusText = '24/7';
+    let statusClass = 'pos';
+
+    if (['BTC', 'ETH', 'SOL', 'BTCUSD', 'BTCUSDT', 'ETHUSD', 'ETHUSDT', 'SOLUSD', 'SOLUSDT'].includes(ticker) || sector === 'CRNCY') {
+      statusText = '24/7 LIVE';
+      statusClass = 'pos';
+    } else if (['N225', '^N225'].includes(ticker)) {
+      const st = this.marketSessions?.TSE || 'CLOSED';
+      statusText = st;
+      statusClass = st === 'OPEN' ? 'pos' : (st === 'LUNCH' ? 'cyan' : 'neu');
+    } else if (['FTSE', '^FTSE', 'DAX', '^GDAXI'].includes(ticker)) {
+      const st = this.marketSessions?.LSE || 'CLOSED';
+      statusText = st;
+      statusClass = st === 'OPEN' ? 'pos' : 'neu';
+    } else {
+      // US Equities and Indices
+      const st = this.marketSessions?.NYSE || 'CLOSED';
+      statusText = st;
+      statusClass = st === 'OPEN' ? 'pos' : (['AFTER-HOURS', 'PRE-MARKET'].includes(st) ? 'cyan' : 'neu');
+    }
+
+    symbolBadge.innerHTML = `${ticker} ${sector} <span class="${statusClass}" style="margin-left: 6px; font-weight: bold; font-size: 11px;">[${statusText}]</span>`;
   }
 
   updateHeaderSpread(ob) {
@@ -418,8 +492,7 @@ class TerminalController {
         }
 
         // Update Header
-        const symbolBadge = document.getElementById('activeSymbol');
-        if (symbolBadge) symbolBadge.innerText = `${this.currentTicker} ${this.currentSector}`;
+        this.updateActiveSecurityBadge();
 
         if (resp.data && resp.data.candles && resp.data.candles.length > 0) {
           if (this.priceChart) this.priceChart.setData(this.currentTicker, resp.data.candles);
