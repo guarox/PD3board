@@ -481,6 +481,11 @@ class EquitiesFeed:
         """Simulates subtle market tick fluctuations only for currently open markets."""
         updated = []
         for symbol, data in {**self.indices, **self.equities}.items():
+            sym_upper = symbol.upper()
+            # Live crypto feeds are streamed directly by Coinbase WebSocket - do not simulate or overwrite
+            if sym_upper in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
+                continue
+
             # If market is closed, freeze prices at official close / cached price
             if not self.is_symbol_market_open(symbol):
                 continue

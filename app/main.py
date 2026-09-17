@@ -73,60 +73,72 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
     real_candles = equities_feed.get_historical_candles(sym)
     if real_candles:
         for c in real_candles:
-            b_time = int(c["time"])
+            b_time = (int(c["time"]) // 60) * 60
+            c_open = float(c["open"])
+            c_close = float(c["close"])
+            c_high = max(float(c["high"]), c_open, c_close)
+            c_low = min(float(c["low"]), c_open, c_close)
+            c_vol = max(1.0, float(c.get("volume", 10.0)))
+
             tb.candles[b_time] = Candle(
                 time=b_time,
-                open=c["open"],
-                high=c["high"],
-                low=c["low"],
-                close=c["close"],
-                volume=c["volume"]
+                open=c_open,
+                high=c_high,
+                low=c_low,
+                close=c_close,
+                volume=c_vol
             )
-            tb.ticks.append(Tick(timestamp=b_time + 10, price=c["open"], size=max(1.0, c["volume"] * 0.25), side="buy"))
-            tb.ticks.append(Tick(timestamp=b_time + 25, price=c["high"], size=max(1.0, c["volume"] * 0.25), side="buy"))
-            tb.ticks.append(Tick(timestamp=b_time + 40, price=c["low"], size=max(1.0, c["volume"] * 0.25), side="sell"))
-            tb.ticks.append(Tick(timestamp=b_time + 55, price=c["close"], size=max(1.0, c["volume"] * 0.25), side="buy" if c["close"] >= c["open"] else "sell"))
+            tb.ticks.append(Tick(timestamp=b_time + 10, price=c_open, size=max(1.0, c_vol * 0.25), side="buy"))
+            tb.ticks.append(Tick(timestamp=b_time + 25, price=c_high, size=max(1.0, c_vol * 0.25), side="buy"))
+            tb.ticks.append(Tick(timestamp=b_time + 40, price=c_low, size=max(1.0, c_vol * 0.25), side="sell"))
+            tb.ticks.append(Tick(timestamp=b_time + 55, price=c_close, size=max(1.0, c_vol * 0.25), side="buy" if c_close >= c_open else "sell"))
         return tb
 
-    # 2. Fallback to generating simulated historical candles around current security price
+    # 2. Fallback to generating natural simulated historical candles around current security price
     expected_price = equities_feed.get_security_price(sym)
-    base_price = expected_price
+    base_price = expected_price if expected_price > 0 else 100.0
     now_ts = time.time()
     current_minute = int(now_ts // 60) * 60
-    step = max(0.02, round(base_price * 0.0004, 2))
+    step = max(0.02, round(base_price * 0.0006, 2))
 
-    # Generate 60 historical minute candles ending at base_price
-    price_walk = [base_price]
+    # Generate 60 realistic continuous minute candles ending at base_price
+    # Walk backward from current minute so the final candle closes at base_price
+    import random
+    rng = random.Random(hash(sym) & 0xFFFFFFFF)
+    candles_list = []
     curr = base_price
-    for i in range(1, 60):
-        drift = (hash(f"{sym}_{i}") % 21 - 10) * step * 0.35
-        reversion = (base_price - curr) * 0.05
-        curr = round(curr + drift + reversion, 2)
-        price_walk.append(curr)
+    for idx in range(60):
+        minute_ts = current_minute - (59 - idx) * 60
+        drift = (rng.random() - 0.49) * step
+        mean_reversion = (base_price - curr) * 0.08
+        next_val = round(curr + drift + mean_reversion, 2)
 
-    price_walk.reverse()
+        c_open = curr
+        c_close = next_val
+        body_min = min(c_open, c_close)
+        body_max = max(c_open, c_close)
+        wick_up = round(rng.uniform(0.05, 0.5) * step, 2)
+        wick_dn = round(rng.uniform(0.05, 0.5) * step, 2)
+        c_high = round(body_max + wick_up, 2)
+        c_low = round(body_min - wick_dn, 2)
+        c_vol = round(rng.uniform(60.0, 450.0), 1)
 
-    for idx, close_p in enumerate(price_walk):
-        bucket_time = current_minute - (59 - idx) * 60
-        prev_p = price_walk[idx - 1] if idx > 0 else close_p
-        open_p = prev_p
-        high_p = round(max(open_p, close_p) + abs(hash(f"{sym}_h_{idx}") % 10) * step * 0.2, 2)
-        low_p = round(min(open_p, close_p) - abs(hash(f"{sym}_l_{idx}") % 10) * step * 0.2, 2)
-        vol = round(100.0 + (hash(f"{sym}_v_{idx}") % 100), 1)
+        candles_list.append((minute_ts, c_open, c_high, c_low, c_close, c_vol))
+        curr = next_val
 
-        tb.candles[bucket_time] = Candle(
-            time=bucket_time,
-            open=open_p,
-            high=high_p,
-            low=low_p,
-            close=close_p,
-            volume=vol
+    for minute_ts, c_open, c_high, c_low, c_close, c_vol in candles_list:
+        tb.candles[minute_ts] = Candle(
+            time=minute_ts,
+            open=c_open,
+            high=c_high,
+            low=c_low,
+            close=c_close,
+            volume=c_vol
         )
-
-        tb.ticks.append(Tick(timestamp=bucket_time + 10, price=open_p, size=vol * 0.25, side="buy"))
-        tb.ticks.append(Tick(timestamp=bucket_time + 25, price=high_p, size=vol * 0.25, side="buy"))
-        tb.ticks.append(Tick(timestamp=bucket_time + 40, price=low_p, size=vol * 0.25, side="sell"))
-        tb.ticks.append(Tick(timestamp=bucket_time + 55, price=close_p, size=vol * 0.25, side="buy" if close_p >= open_p else "sell"))
+        tb.ticks.append(Tick(timestamp=minute_ts + 10, price=c_open, size=round(c_vol * 0.25, 1), side="buy"))
+        tb.ticks.append(Tick(timestamp=minute_ts + 25, price=c_high, size=round(c_vol * 0.25, 1), side="buy"))
+        tb.ticks.append(Tick(timestamp=minute_ts + 40, price=c_low, size=round(c_vol * 0.25, 1), side="sell"))
+        tb.ticks.append(Tick(timestamp=minute_ts + 55, price=c_close, size=round(c_vol * 0.25, 1), side="buy" if c_close >= c_open else "sell"))
 
     return tb
 
@@ -244,7 +256,7 @@ async def equities_broadcaster():
                     sym = item["symbol"]
                     price = item["price"]
                     chg = item["change"]
-                    if sym in tick_buffers:
+                    if sym in tick_buffers and sym.upper() not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
                         tick = tick_buffers[sym].add_tick(
                             price=price,
                             size=round(50.0 + (hash(f"{sym}_{price}") % 50), 1),

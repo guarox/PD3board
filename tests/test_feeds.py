@@ -219,4 +219,23 @@ def test_market_sessions_and_hours():
     # Private equity unlisted is always closed
     assert feed.is_symbol_market_open("SPACEX") is False
 
+def test_crypto_excluded_from_synthetic_ticks():
+    from app.feeds.equities import EquitiesFeed
+    feed = EquitiesFeed()
+    updates = feed.update_ticks()
+    symbols = [u["symbol"].upper() for u in updates]
+    crypto_symbols = {"BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"}
+    assert not any(s in crypto_symbols for s in symbols)
+
+def test_tick_buffer_pruning():
+    from app.engine.tick_buffer import TickBuffer
+    tb = TickBuffer("TEST", max_ticks=500)
+    # Add ticks across 350 minutes
+    for m in range(350):
+        tb.add_tick(price=100.0 + m, size=1.0, timestamp=float(m * 60))
+    candles = tb.get_candles(limit=500)
+    assert len(tb.candles) <= 300
+    assert len(candles) <= 300
+
+
 

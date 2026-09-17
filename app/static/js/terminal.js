@@ -89,6 +89,20 @@ class TerminalController {
     this.initWebSocket();
     this.initClock();
     this.updateMarketStatus(this.marketSessions);
+
+    // Periodic background sync to keep candlestick chart aligned with server state
+    setInterval(() => {
+      if (this.priceChart && this.currentTicker && this.currentFunction === 'GP') {
+        fetch(`/api/ticks/${this.currentTicker}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data && data.candles && this.priceChart && this.currentFunction === 'GP') {
+              this.priceChart.syncCandles(data.candles);
+            }
+          })
+          .catch(() => {});
+      }
+    }, 20000);
   }
 
   initUI() {
@@ -332,7 +346,7 @@ class TerminalController {
       if (this.isTickerMatch(msg.symbol, this.currentTicker)) {
         this.updateHeaderPrice(msg.price, msg.side);
         if (this.priceChart) {
-          this.priceChart.updateLiveTick(msg.price, msg.size);
+          this.priceChart.updateLiveTick(msg.price, msg.size, msg.timestamp);
         }
       }
     } else if (msg.type === 'depth') {
@@ -349,7 +363,7 @@ class TerminalController {
           if (this.isTickerMatch(t.symbol, this.currentTicker)) {
             this.updateHeaderPrice(t.price, t.change >= 0 ? 'buy' : 'sell');
             if (this.priceChart) {
-              this.priceChart.updateLiveTick(t.price, 100);
+              this.priceChart.updateLiveTick(t.price, 100, t.timestamp);
             }
           }
         });
