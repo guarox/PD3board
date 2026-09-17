@@ -72,6 +72,28 @@ def test_news_feed():
     news = feed.get_latest_news()
     assert len(news) > 0
     assert "headline" in news[0]
+    assert "ticker" in news[0]
+    assert "sentiment" in news[0]
+
+    # Test ticker extraction heuristics
+    assert feed.extract_ticker("Bitcoin jumps past 76k") == "BTCUSD"
+    assert feed.extract_ticker("Nvidia unveils new Blackwell chip") == "NVDA"
+    assert feed.extract_ticker("Fed rate cuts expected in December") == "US10Y"
+    assert feed.extract_ticker("Southwest (LUV) reports earnings") == "LUV"
+
+    # Test sentiment heuristics
+    assert feed.classify_sentiment("S&P 500 surges to record highs") == "BULLISH"
+    assert feed.classify_sentiment("Tech stocks plunge amid market selloff") == "BEARISH"
+    assert feed.classify_sentiment("Central bank announces meeting date") == "NEUTRAL"
+
+def test_news_feed_refresh():
+    import asyncio
+    feed = NewsFeed()
+    new_items = asyncio.run(feed.refresh_news())
+    assert isinstance(new_items, list)
+    latest = feed.get_latest_news(5)
+    assert len(latest) > 0
+    assert "epoch" in latest[0]
 
 def test_eco_feed():
     feed = EcoFeed()
