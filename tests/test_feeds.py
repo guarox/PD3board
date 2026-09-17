@@ -181,3 +181,20 @@ def test_ai_research_feed():
     assert len(memo["downside_risks"]) >= 3
     assert "fwd_pe" in memo["valuation_assessment"]
 
+def test_market_sessions_and_hours():
+    from app.feeds.equities import EquitiesFeed
+    feed = EquitiesFeed()
+    sessions = feed.get_market_sessions()
+    assert "NYSE" in sessions
+    assert "LSE" in sessions
+    assert "TSE" in sessions
+    assert sessions["CRNCY"] == "OPEN"
+    assert sessions["NYSE"] in ("OPEN", "CLOSED", "AFTER-HOURS", "PRE-MARKET")
+
+    # Crypto is always open 24/7
+    assert feed.is_symbol_market_open("BTC") is True
+    assert feed.is_symbol_market_open("ETHUSDT") is True
+    # Private equity unlisted is always closed
+    assert feed.is_symbol_market_open("SPACEX") is False
+
+

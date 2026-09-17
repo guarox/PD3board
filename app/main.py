@@ -217,8 +217,16 @@ coinbase_feed = CoinbaseFeed(
 
 async def equities_broadcaster():
     """Background task to broadcast equities/indices updates periodically."""
+    broadcast_count = 0
     while True:
         try:
+            broadcast_count += 1
+            if broadcast_count % 2 == 0:
+                await broadcast({
+                    "type": "market_status",
+                    "data": equities_feed.get_market_sessions()
+                })
+
             updates = equities_feed.update_ticks()
             if updates:
                 await broadcast({
@@ -500,6 +508,13 @@ async def get_orderbook(symbol: str):
     ob = get_or_create_orderbook(sym)
     return ob.get_snapshot() if ob else {}
 
+@app.get("/api/market-status")
+async def get_market_status():
+    return {
+        "status": "success",
+        "data": equities_feed.get_market_sessions()
+    }
+
 @app.get("/api/ticks/{symbol}")
 async def get_ticks(symbol: str):
     sym = symbol.upper()
@@ -516,6 +531,11 @@ async def websocket_endpoint(websocket: WebSocket):
     active_connections.add(websocket)
     try:
         # Send initial snapshot upon connection
+        await websocket.send_text(json.dumps({
+            "type": "market_status",
+            "data": equities_feed.get_market_sessions()
+        }))
+
         ob = orderbooks.get(Config.DEFAULT_CRYPTO)
         if ob:
             await websocket.send_text(json.dumps({

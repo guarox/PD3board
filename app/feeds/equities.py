@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import json
+import datetime
 import logging
 import random
 import time
@@ -413,10 +414,77 @@ class EquitiesFeed:
             return quote["candles"]
         return []
 
+    def get_market_sessions(self) -> Dict[str, str]:
+        """Calculates current trading session status for major global exchanges."""
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        weekday = now_utc.weekday()  # 0=Monday, 4=Friday, 5=Saturday, 6=Sunday
+        is_weekend = weekday >= 5
+
+        # 1. NYSE / NASDAQ (Eastern Time: UTC-4 in EDT / UTC-5 in EST)
+        utc_minutes = now_utc.hour * 60 + now_utc.minute
+        if is_weekend:
+            nyse_status = "CLOSED"
+        elif 13 * 60 + 30 <= utc_minutes < 20 * 60:
+            nyse_status = "OPEN"
+        elif 20 * 60 <= utc_minutes < 24 * 60:
+            nyse_status = "AFTER-HOURS"
+        elif 8 * 60 <= utc_minutes < 13 * 60 + 30:
+            nyse_status = "PRE-MARKET"
+        else:
+            nyse_status = "CLOSED"
+
+        # 2. LSE (London: UTC+1 in BST / UTC+0 in GMT)
+        if is_weekend:
+            lse_status = "CLOSED"
+        elif 7 * 60 <= utc_minutes < 15 * 60 + 30:
+            lse_status = "OPEN"
+        else:
+            lse_status = "CLOSED"
+
+        # 3. TSE (Tokyo: UTC+9, no DST)
+        tokyo_now = now_utc + datetime.timedelta(hours=9)
+        tokyo_weekday = tokyo_now.weekday()
+        tokyo_minutes = tokyo_now.hour * 60 + tokyo_now.minute
+        if tokyo_weekday >= 5:
+            tse_status = "CLOSED"
+        elif (9 * 60 <= tokyo_minutes < 11 * 60 + 30) or (12 * 60 + 30 <= tokyo_minutes < 15 * 60 + 30):
+            tse_status = "OPEN"
+        elif 11 * 60 + 30 <= tokyo_minutes < 12 * 60 + 30:
+            tse_status = "LUNCH"
+        else:
+            tse_status = "CLOSED"
+
+        return {
+            "NYSE": nyse_status,
+            "LSE": lse_status,
+            "TSE": tse_status,
+            "CRNCY": "OPEN"
+        }
+
+    def is_symbol_market_open(self, symbol: str) -> bool:
+        """Determines if the given asset is currently in an active trading session."""
+        sym = symbol.upper()
+        if sym in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
+            return True
+        if sym in PRIVATE_SECURITIES:
+            return False
+
+        sessions = self.get_market_sessions()
+        if sym in ("N225", "^N225"):
+            return sessions["TSE"] == "OPEN"
+        if sym in ("FTSE", "^FTSE", "DAX", "^GDAXI"):
+            return sessions["LSE"] == "OPEN"
+        # Default US equities and indices (NYSE / NASDAQ)
+        return sessions["NYSE"] == "OPEN"
+
     def update_ticks(self) -> List[Dict[str, Any]]:
-        """Simulates subtle market tick fluctuations around current prices."""
+        """Simulates subtle market tick fluctuations only for currently open markets."""
         updated = []
         for symbol, data in {**self.indices, **self.equities}.items():
+            # If market is closed, freeze prices at official close / cached price
+            if not self.is_symbol_market_open(symbol):
+                continue
+
             if random.random() < 0.4:
                 quote = self.live_cache.get(symbol, {}).get("data")
                 curr_price = quote["price"] if quote else data["price"]
