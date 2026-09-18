@@ -177,15 +177,23 @@ class PriceChart {
         losses += loss;
         const avgGain = gains / period;
         const avgLoss = losses / period;
-        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-        rsi.push(100 - (100 / (1 + rs)));
+        if (avgGain === 0 && avgLoss === 0) {
+          rsi.push(50.0);
+        } else {
+          const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+          rsi.push(100 - (100 / (1 + rs)));
+        }
       } else {
         const avgGain = (gains * (period - 1) + gain) / period;
         const avgLoss = (losses * (period - 1) + loss) / period;
         gains = avgGain;
         losses = avgLoss;
-        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-        rsi.push(100 - (100 / (1 + rs)));
+        if (avgGain === 0 && avgLoss === 0) {
+          rsi.push(50.0);
+        } else {
+          const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+          rsi.push(100 - (100 / (1 + rs)));
+        }
       }
     }
     return rsi;
@@ -233,9 +241,10 @@ class PriceChart {
     if (interval === '1M') return [...rawCandles];
 
     let groupSize = 5;
-    if (interval === '15M') groupSize = 15;
+    if (interval === '5M') groupSize = 5;
+    else if (interval === '15M') groupSize = 15;
     else if (interval === '1H') groupSize = 60;
-    else if (interval === '1D') groupSize = 240;
+    else if (interval === '1D') groupSize = Math.max(15, Math.min(240, Math.floor(rawCandles.length / 6) || 60));
 
     const aggregated = [];
     for (let i = 0; i < rawCandles.length; i += groupSize) {
@@ -324,7 +333,7 @@ class PriceChart {
         close: price,
         volume: size || 1
       });
-      if (this.rawCandles.length > 120) {
+      if (this.rawCandles.length > 300) {
         this.rawCandles.shift();
       }
     } else {
@@ -406,14 +415,48 @@ class PriceChart {
       maxPrice = Math.max(maxPrice, this.currentPrice);
     }
 
-    // Padding (headroom and footroom with proportional minimum to avoid artificial vertical distortion on tight ranges)
-    const rawRange = (maxPrice - minPrice);
-    const minPadding = Math.max(rawRange * 0.06, (maxPrice * 0.0008) || 0.5);
-    minPrice -= minPadding;
-    maxPrice += minPadding;
+    if (!isFinite(minPrice) || !isFinite(maxPrice)) {
+      minPrice = 0;
+      maxPrice = 100;
+    }
 
-    const priceToY = (p) => marginTop + pricePlotHeight - ((p - minPrice) / (maxPrice - minPrice)) * pricePlotHeight;
-    const yToPrice = (y) => maxPrice - ((y - marginTop) / pricePlotHeight) * (maxPrice - minPrice);
+    // Proportional padding based on actual price magnitude and range
+    const rawRange = (maxPrice - minPrice);
+    let padding = 0;
+    if (rawRange <= 0.000001) {
+      padding = maxPrice > 0 ? maxPrice * 0.02 : 1.0;
+    } else {
+      padding = Math.max(rawRange * 0.08, maxPrice * 0.0005);
+    }
+    minPrice -= padding;
+    maxPrice += padding;
+    if (maxPrice <= minPrice) {
+      minPrice -= 1;
+      maxPrice += 1;
+    }
+
+    const priceSpan = maxPrice - minPrice;
+    const priceToY = (p) => marginTop + pricePlotHeight - ((p - minPrice) / (priceSpan || 1)) * pricePlotHeight;
+    const yToPrice = (y) => maxPrice - ((y - marginTop) / (pricePlotHeight || 1)) * priceSpan;
+
+    // Dynamic price formatting precision
+    const getDecimals = (val, span) => {
+      const p = Math.abs(val || 0);
+      const s = Math.abs(span || 1);
+      if (s < 0.0005 || p < 0.01) return 5;
+      if (s < 0.005 || p < 0.5) return 4;
+      if (s < 0.05 || p < 2.0) return 4;
+      if (s < 0.5 || p < 20.0) return 3;
+      return 2;
+    };
+    const precision = getDecimals(this.currentPrice || maxPrice, priceSpan);
+    const formatP = (val, prec = precision) => {
+      if (val === null || val === undefined || isNaN(val)) return '0.00';
+      return Number(val).toLocaleString('en-US', {
+        minimumFractionDigits: prec,
+        maximumFractionDigits: prec
+      });
+    };
 
     // Draw Grid Lines & Price Axis
     ctx.strokeStyle = '#1e1a0d';
@@ -424,14 +467,14 @@ class PriceChart {
     const gridSteps = 5;
     for (let i = 0; i <= gridSteps; i++) {
       const y = marginTop + (pricePlotHeight / gridSteps) * i;
-      const p = maxPrice - ((maxPrice - minPrice) / gridSteps) * i;
+      const p = maxPrice - (priceSpan / gridSteps) * i;
 
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(plotWidth, y);
       ctx.stroke();
 
-      ctx.fillText(p.toFixed(2), plotWidth + 6, y + 3);
+      ctx.fillText(formatP(p), plotWidth + 6, y + 3);
     }
 
     // Calculate dynamic candle width with zoom and pan
@@ -799,7 +842,7 @@ class PriceChart {
         ctx.fillRect(plotWidth, liveY - 9, marginRight, 18);
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 10px monospace';
-        ctx.fillText(this.currentPrice.toFixed(2), plotWidth + 4, liveY + 4);
+        ctx.fillText(formatP(this.currentPrice), plotWidth + 4, liveY + 4);
       }
     }
 
@@ -834,14 +877,14 @@ class PriceChart {
         ctx.fillRect(plotWidth, crossY - 8, marginRight, 16);
         ctx.fillStyle = '#000000';
         ctx.font = 'bold 9px monospace';
-        ctx.fillText(hoverPrice.toFixed(2), plotWidth + 4, crossY + 4);
+        ctx.fillText(formatP(hoverPrice), plotWidth + 4, crossY + 4);
       }
 
       // Top HUD Bar showing candle metrics
       if (hoveredCandle) {
         const c = hoveredCandle;
         const chg = c.close - c.open;
-        const chgPct = (chg / c.open) * 100;
+        const chgPct = (c.open > 0) ? (chg / c.open) * 100 : 0;
         const chgColor = chg >= 0 ? '#00ff66' : '#ff3344';
         const sign = chg >= 0 ? '+' : '';
 
@@ -859,27 +902,27 @@ class PriceChart {
         ctx.fillStyle = '#888';
         ctx.fillText('O:', tx, 16); tx += 15;
         ctx.fillStyle = '#fff';
-        ctx.fillText(c.open.toFixed(2), tx, 16); tx += 55;
+        ctx.fillText(formatP(c.open), tx, 16); tx += 55;
 
         ctx.fillStyle = '#888';
         ctx.fillText('H:', tx, 16); tx += 15;
         ctx.fillStyle = '#00ff66';
-        ctx.fillText(c.high.toFixed(2), tx, 16); tx += 55;
+        ctx.fillText(formatP(c.high), tx, 16); tx += 55;
 
         ctx.fillStyle = '#888';
         ctx.fillText('L:', tx, 16); tx += 15;
         ctx.fillStyle = '#ff3344';
-        ctx.fillText(c.low.toFixed(2), tx, 16); tx += 55;
+        ctx.fillText(formatP(c.low), tx, 16); tx += 55;
 
         ctx.fillStyle = '#888';
         ctx.fillText('C:', tx, 16); tx += 15;
         ctx.fillStyle = '#fff';
-        ctx.fillText(c.close.toFixed(2), tx, 16); tx += 55;
+        ctx.fillText(formatP(c.close), tx, 16); tx += 55;
 
         ctx.fillStyle = '#888';
         ctx.fillText('CHG:', tx, 16); tx += 28;
         ctx.fillStyle = chgColor;
-        ctx.fillText(`${sign}${chg.toFixed(2)} (${sign}${chgPct.toFixed(2)}%)`, tx, 16); tx += 95;
+        ctx.fillText(`${sign}${formatP(chg)} (${sign}${chgPct.toFixed(2)}%)`, tx, 16); tx += 95;
 
         ctx.fillStyle = '#888';
         ctx.fillText('VOL:', tx, 16); tx += 28;

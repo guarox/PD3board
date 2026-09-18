@@ -11,22 +11,30 @@ from typing import Dict, Any, List, Optional
 logger = logging.getLogger(__name__)
 
 SYMBOL_MAP = {
+    # Major US & Global Indices
     "SPX": "^GSPC",
     "^GSPC": "^GSPC",
+    "SP500": "^GSPC",
     "NDX": "^IXIC",
     "^IXIC": "^IXIC",
+    "NASDAQ": "^IXIC",
+    "NASDAQ100": "^IXIC",
     "DJI": "^DJI",
     "^DJI": "^DJI",
+    "DOW": "^DJI",
     "RUT": "^RUT",
     "^RUT": "^RUT",
+    "RUSSELL": "^RUT",
     "VIX": "^VIX",
     "^VIX": "^VIX",
     "FTSE": "^FTSE",
     "^FTSE": "^FTSE",
     "N225": "^N225",
     "^N225": "^N225",
+    "NIKKEI": "^N225",
     "DAX": "^GDAXI",
     "^GDAXI": "^GDAXI",
+    # Crypto Assets
     "BTC": "BTC-USD",
     "BTCUSD": "BTC-USD",
     "BTCUSDT": "BTC-USD",
@@ -36,6 +44,74 @@ SYMBOL_MAP = {
     "SOL": "SOL-USD",
     "SOLUSD": "SOL-USD",
     "SOLUSDT": "SOL-USD",
+    "DOGE": "DOGE-USD",
+    "DOGEUSD": "DOGE-USD",
+    "DOGEUSDT": "DOGE-USD",
+    "XRP": "XRP-USD",
+    "XRPUSD": "XRP-USD",
+    "XRPUSDT": "XRP-USD",
+    "ADA": "ADA-USD",
+    "ADAUSD": "ADA-USD",
+    "ADAUSDT": "ADA-USD",
+    "BNB": "BNB-USD",
+    "BNBUSD": "BNB-USD",
+    "BNBUSDT": "BNB-USD",
+    "AVAX": "AVAX-USD",
+    "AVAXUSD": "AVAX-USD",
+    "AVAXUSDT": "AVAX-USD",
+    # Global Currencies & Forex Pairs
+    "EURUSD": "EURUSD=X",
+    "EUR": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "GBP": "GBPUSD=X",
+    "USDJPY": "JPY=X",
+    "JPY": "JPY=X",
+    "AUDUSD": "AUDUSD=X",
+    "AUD": "AUDUSD=X",
+    "USDCAD": "CAD=X",
+    "CAD": "CAD=X",
+    "USDCHF": "CHF=X",
+    "CHF": "CHF=X",
+    "NZDUSD": "NZDUSD=X",
+    "NZD": "NZDUSD=X",
+    "USDCNH": "CNH=X",
+    "CNH": "CNH=X",
+    "USDMXN": "MXN=X",
+    "MXN": "MXN=X",
+    "DXY": "DX-Y.NYB",
+    # Commodities & Energy Futures
+    "CL1": "CL=F",
+    "CL": "CL=F",
+    "CRUDE": "CL=F",
+    "OIL": "CL=F",
+    "CO1": "BZ=F",
+    "BRENT": "BZ=F",
+    "GC1": "GC=F",
+    "GC": "GC=F",
+    "GOLD": "GC=F",
+    "SI1": "SI=F",
+    "SI": "SI=F",
+    "SILVER": "SI=F",
+    "HG1": "HG=F",
+    "HG": "HG=F",
+    "COPPER": "HG=F",
+    "NG1": "NG=F",
+    "NG": "NG=F",
+    "NATGAS": "NG=F",
+    "W1": "ZW=F",
+    "WHEAT": "ZW=F",
+    "C1": "ZC=F",
+    "CORN": "ZC=F",
+    # Treasury Yields & Government Rates
+    "US10Y": "^TNX",
+    "TNX": "^TNX",
+    "US5Y": "^FVX",
+    "FVX": "^FVX",
+    "US30Y": "^TYX",
+    "TYX": "^TYX",
+    "US2Y": "2YY=F",
+    "US3M": "^IRX",
+    "IRX": "^IRX",
 }
 
 PRIVATE_SECURITIES: Dict[str, Dict[str, Any]] = {
@@ -384,12 +460,14 @@ class EquitiesFeed:
                         c = closes[i]
                         v = volumes[i] if i < len(volumes) and volumes[i] is not None else 0
                         if None not in (o, h, l, c):
+                            fv_o, fv_h, fv_l, fv_c = float(o), float(h), float(l), float(c)
+                            dec = 6 if fv_c < 0.01 else (5 if fv_c < 0.5 else (4 if fv_c < 2.0 else (3 if fv_c < 20.0 else 2)))
                             candles.append({
                                 "time": int(ts),
-                                "open": round(float(o), 2),
-                                "high": round(float(h), 2),
-                                "low": round(float(l), 2),
-                                "close": round(float(c), 2),
+                                "open": round(fv_o, dec),
+                                "high": round(fv_h, dec),
+                                "low": round(fv_l, dec),
+                                "close": round(fv_c, dec),
                                 "volume": round(float(v), 1)
                             })
 
@@ -398,11 +476,15 @@ class EquitiesFeed:
                 if price is None and candles:
                     price = candles[-1]["close"]
 
+                p_val = float(price) if price is not None else 100.0
+                pc_val = float(prev_close) if prev_close is not None else p_val
+                p_dec = 6 if p_val < 0.01 else (5 if p_val < 0.5 else (4 if p_val < 2.0 else (3 if p_val < 20.0 else 2)))
+
                 quote_data = {
                     "symbol": sym,
                     "name": meta.get("shortName") or meta.get("longName") or sym,
-                    "price": round(float(price), 2) if price is not None else 100.0,
-                    "prev_close": round(float(prev_close), 2) if prev_close is not None else round(float(price or 100.0), 2),
+                    "price": round(p_val, p_dec),
+                    "prev_close": round(pc_val, p_dec),
                     "day_high": meta.get("regularMarketDayHigh"),
                     "day_low": meta.get("regularMarketDayLow"),
                     "range_52w": f"{meta.get('fiftyTwoWeekLow', 'N/A')} - {meta.get('fiftyTwoWeekHigh', 'N/A')}",

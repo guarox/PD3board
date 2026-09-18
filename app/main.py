@@ -110,28 +110,40 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
     base_price = expected_price if expected_price > 0 else 100.0
     now_ts = time.time()
     current_minute = int(now_ts // 60) * 60
-    step = max(0.01, round(base_price * 0.0003, 2))
 
-    # Generate 60 realistic continuous minute candles ending at base_price
-    # Walk backward from current minute so the final candle closes at base_price
+    if base_price < 0.01:
+        dec = 6
+    elif base_price < 0.5:
+        dec = 5
+    elif base_price < 2.0:
+        dec = 4
+    elif base_price < 20.0:
+        dec = 3
+    else:
+        dec = 2
+
+    step = max(10 ** (-dec), base_price * (0.0004 if base_price > 10 else 0.0008))
+
+    # Generate 90 realistic continuous minute candles ending near base_price
     import random
     rng = random.Random(hash(sym) & 0xFFFFFFFF)
     candles_list = []
     curr = base_price
-    for idx in range(60):
-        minute_ts = current_minute - (59 - idx) * 60
+    num_candles = 90
+    for idx in range(num_candles):
+        minute_ts = current_minute - (num_candles - 1 - idx) * 60
         drift = (rng.random() - 0.49) * step
-        mean_reversion = (base_price - curr) * 0.03
-        next_val = round(curr + drift + mean_reversion, 2)
+        mean_reversion = (base_price - curr) * 0.04
+        next_val = round(curr + drift + mean_reversion, dec)
 
         c_open = curr
         c_close = next_val
         body_min = min(c_open, c_close)
         body_max = max(c_open, c_close)
-        wick_up = round(rng.uniform(0.02, 0.15) * step, 2)
-        wick_dn = round(rng.uniform(0.02, 0.15) * step, 2)
-        c_high = round(body_max + wick_up, 2)
-        c_low = round(body_min - wick_dn, 2)
+        wick_up = round(rng.uniform(0.1, 0.4) * step, dec)
+        wick_dn = round(rng.uniform(0.1, 0.4) * step, dec)
+        c_high = round(body_max + wick_up, dec)
+        c_low = round(max(body_min - wick_dn, 0.000001), dec)
         c_vol = round(rng.uniform(200.0, 1500.0), 1)
 
         candles_list.append((minute_ts, c_open, c_high, c_low, c_close, c_vol))
@@ -166,18 +178,31 @@ def get_or_create_orderbook(sym: str) -> OrderBook:
         price = equities_feed.get_security_price(sym, prefer_live=True)
         if price >= 10000:
             tick = 0.50
+            dec = 2
         elif price >= 1000:
             tick = 0.25
+            dec = 2
         elif price >= 100:
             tick = 0.05
-        else:
+            dec = 2
+        elif price >= 10:
             tick = 0.01
+            dec = 2
+        elif price >= 2:
+            tick = 0.005
+            dec = 3
+        elif price >= 0.1:
+            tick = 0.0001
+            dec = 4
+        else:
+            tick = 0.00001
+            dec = 6
 
         raw_bids = []
         raw_asks = []
         for i in range(1, 11):
-            bid_p = round(price - i * tick, 2)
-            ask_p = round(price + i * tick, 2)
+            bid_p = round(price - i * tick, dec)
+            ask_p = round(price + i * tick, dec)
             bid_sz = round(10.0 + (hash(f"{sym}_b_{i}") % 80) * 1.5, 2)
             ask_sz = round(10.0 + (hash(f"{sym}_a_{i}") % 80) * 1.5, 2)
             raw_bids.append([bid_p, bid_sz])
