@@ -59,3 +59,11 @@ def test_multi_timeframe_historical_candles():
             assert candles[i]["high"] >= candles[i]["low"]
             assert candles[i]["open"] > 0
             assert candles[i]["close"] > 0
+
+    # 1D should have at least 200 daily bars (1+ to 5 years of daily history)
+    daily_candles = feed.fetch_historical_candles("AAPL", interval="1D")
+    assert len(daily_candles) >= 200, f"Expected >= 200 daily bars, got {len(daily_candles)}"
+
+    # 1M should have multiple days of intraday minute bars (>= 300 bars)
+    min_candles = feed.fetch_historical_candles("AAPL", interval="1M")
+    assert len(min_candles) >= 300, f"Expected >= 300 minute bars, got {len(min_candles)}"

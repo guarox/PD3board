@@ -94,7 +94,7 @@ class PriceChart {
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-      this.zoomLevel = Math.max(0.5, Math.min(3.0, this.zoomLevel * zoomFactor));
+      this.zoomLevel = Math.max(0.15, Math.min(5.0, this.zoomLevel * zoomFactor));
       this.render();
     }, { passive: false });
 
@@ -344,7 +344,7 @@ class PriceChart {
         close: price,
         volume: size || 1
       });
-      if (this.rawCandles.length > 300) {
+      if (this.rawCandles.length > 3000) {
         this.rawCandles.shift();
       }
     } else {
@@ -410,18 +410,45 @@ class PriceChart {
       macdHeight = subPaneHeight;
     }
 
-    // Calculate High / Low range
+    // Calculate dynamic candle width with zoom and pan
+    const baseCandleWidth = Math.max(2, Math.floor(plotWidth / (Math.min(this.candles.length, 220) * 1.5)));
+    const candleWidth = Math.min(32, Math.max(1, Math.floor(baseCandleWidth * this.zoomLevel)));
+    const gap = candleWidth > 2 ? Math.max(1, Math.floor(candleWidth * 0.35)) : (candleWidth > 1 ? 1 : 0);
+    const totalCandleSpan = Math.max(1, candleWidth + gap);
+
+    // Bounded pan offset and right-alignment (anchors latest bars to the right edge)
+    const totalContentWidth = this.candles.length * totalCandleSpan;
+    const rightAlignOffset = plotWidth - totalContentWidth - 10;
+    const minPan = -30;
+    const maxPan = Math.max(0, totalContentWidth - plotWidth + 30);
+    this.panOffset = Math.max(minPan, Math.min(maxPan, this.panOffset));
+
+    // Calculate High / Low range for visible candles in current viewport
     let minPrice = Infinity;
     let maxPrice = -Infinity;
     let maxVol = 0;
+    let visibleCount = 0;
 
-    for (const c of this.candles) {
-      if (c.low < minPrice) minPrice = c.low;
-      if (c.high > maxPrice) maxPrice = c.high;
-      if (c.volume > maxVol) maxVol = c.volume;
+    for (let i = 0; i < this.candles.length; i++) {
+      const c = this.candles[i];
+      const rawX = rightAlignOffset + i * totalCandleSpan + this.panOffset;
+      if (rawX + candleWidth >= -20 && rawX <= plotWidth + 20) {
+        if (c.low < minPrice) minPrice = c.low;
+        if (c.high > maxPrice) maxPrice = c.high;
+        if (c.volume > maxVol) maxVol = c.volume;
+        visibleCount++;
+      }
     }
 
-    if (this.currentPrice > 0) {
+    if (visibleCount === 0 || !isFinite(minPrice) || !isFinite(maxPrice)) {
+      for (const c of this.candles) {
+        if (c.low < minPrice) minPrice = c.low;
+        if (c.high > maxPrice) maxPrice = c.high;
+        if (c.volume > maxVol) maxVol = c.volume;
+      }
+    }
+
+    if (this.currentPrice > 0 && this.panOffset <= 50) {
       minPrice = Math.min(minPrice, this.currentPrice);
       maxPrice = Math.max(maxPrice, this.currentPrice);
     }
@@ -487,19 +514,6 @@ class PriceChart {
 
       ctx.fillText(formatP(p), plotWidth + 6, y + 3);
     }
-
-    // Calculate dynamic candle width with zoom and pan
-    const baseCandleWidth = Math.max(2, Math.floor(plotWidth / (this.candles.length * 1.5)));
-    const candleWidth = Math.min(32, Math.max(3, Math.floor(baseCandleWidth * this.zoomLevel)));
-    const gap = Math.max(1, Math.floor(candleWidth * 0.4));
-    const totalCandleSpan = candleWidth + gap;
-
-    // Bounded pan offset and right-alignment
-    const totalContentWidth = this.candles.length * totalCandleSpan;
-    const rightAlignOffset = (totalContentWidth < plotWidth) ? (plotWidth - totalContentWidth - 15) : 10;
-    const minPan = Math.min(0, plotWidth - totalContentWidth - 20);
-    const maxPan = 20;
-    this.panOffset = Math.max(minPan, Math.min(maxPan, this.panOffset));
 
     // Bollinger Bands Calculation & Rendering
     if (this.indicators.BOLL && this.candles.length >= 5) {

@@ -520,11 +520,11 @@ class EquitiesFeed:
             return self.historical_cache[cache_key]["candles"]
 
         config_map = {
-            "1M": ("1m", "1d", 20.0),
-            "5M": ("5m", "5d", 60.0),
-            "15M": ("15m", "1mo", 180.0),
-            "1H": ("60m", "3mo", 300.0),
-            "1D": ("1d", "1y", 1800.0),
+            "1M": ("1m", "5d", 20.0),    # 5 full trading days of 1m bars (~2,000 to 5,800 bars)
+            "5M": ("5m", "1mo", 60.0),   # 1 full month of 5m bars (~1,700 to 8,900 bars)
+            "15M": ("15m", "1mo", 180.0), # 1 full month of 15m bars (~600 to 3,000 bars)
+            "1H": ("60m", "1y", 300.0),  # 1 full year of hourly bars (~1,750 to 8,700 bars)
+            "1D": ("1d", "5y", 1800.0),  # 5 full years of daily bars (~1,250 to 1,820 bars)
         }
         yf_interval, yf_range, cache_ttl = config_map[norm_interval]
 
