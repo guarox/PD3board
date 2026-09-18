@@ -229,13 +229,14 @@ def test_crypto_excluded_from_synthetic_ticks():
 
 def test_tick_buffer_pruning():
     from app.engine.tick_buffer import TickBuffer
-    tb = TickBuffer("TEST", max_ticks=500)
-    # Add ticks across 350 minutes
-    for m in range(350):
-        tb.add_tick(price=100.0 + m, size=1.0, timestamp=float(m * 60))
-    candles = tb.get_candles(limit=500)
-    assert len(tb.candles) <= 300
-    assert len(candles) <= 300
+    tb = TickBuffer("TEST", max_ticks=2000)
+    # Add ticks across 3100 minutes to trigger circular buffer pruning
+    for m in range(3100):
+        tb.add_tick(price=100.0 + (m % 50), size=1.0, timestamp=float(m * 60))
+    candles = tb.get_candles(limit=3000)
+    assert len(tb.candles) <= 3000
+    assert len(tb.candles) >= 2500
+    assert len(candles) <= 3000
 
 def test_equities_brownian_tick_walk():
     from app.feeds.equities import EquitiesFeed

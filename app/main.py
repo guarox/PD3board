@@ -86,9 +86,9 @@ def sync_tick_buffer_with_real_candles(sym: str) -> TickBuffer:
                 close=c_close,
                 volume=c_vol
             )
-        # Circular prune if exceeding 300 bars
-        if len(tb.candles) > 300:
-            oldest_keys = sorted(tb.candles.keys())[:-250]
+        # Circular prune if exceeding 3000 bars
+        if len(tb.candles) > 3000:
+            oldest_keys = sorted(tb.candles.keys())[:-2500]
             for old_k in oldest_keys:
                 del tb.candles[old_k]
 
@@ -124,12 +124,12 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
 
     step = max(10 ** (-dec), base_price * (0.0004 if base_price > 10 else 0.0008))
 
-    # Generate 90 realistic continuous minute candles ending near base_price
+    # Generate 500 realistic continuous minute candles ending near base_price
     import random
     rng = random.Random(hash(sym) & 0xFFFFFFFF)
     candles_list = []
     curr = base_price
-    num_candles = 90
+    num_candles = 500
     for idx in range(num_candles):
         minute_ts = current_minute - (num_candles - 1 - idx) * 60
         drift = (rng.random() - 0.49) * step
@@ -424,7 +424,7 @@ async def execute_command(req: CommandRequest):
         data = {
             "symbol": ticker,
             "interval": "1M",
-            "candles": tb.get_candles(limit=300),
+            "candles": tb.get_candles(limit=2500),
             "ticks": tb.get_recent_ticks()
         }
     elif fn == "L2":
@@ -632,7 +632,7 @@ async def get_ticks(symbol: str, interval: str = "1M"):
         return {
             "symbol": sym,
             "interval": "1M",
-            "candles": tb.get_candles(limit=300),
+            "candles": tb.get_candles(limit=2500),
             "ticks": tb.get_recent_ticks()
         }
 

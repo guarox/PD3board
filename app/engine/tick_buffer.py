@@ -24,7 +24,7 @@ class TickBuffer:
     Circular tick buffer storing high-frequency trade ticks
     and synthesizing minute-based OHLCV candles.
     """
-    def __init__(self, symbol: str, max_ticks: int = 500):
+    def __init__(self, symbol: str, max_ticks: int = 2000):
         self.symbol = symbol
         self.max_ticks = max_ticks
         self.ticks = deque(maxlen=max_ticks)
@@ -53,8 +53,8 @@ class TickBuffer:
             c.close = price
             c.volume += size
 
-        if len(self.candles) > 300:
-            oldest_keys = sorted(self.candles.keys())[:-200]
+        if len(self.candles) > 3000:
+            oldest_keys = sorted(self.candles.keys())[:-2500]
             for old_k in oldest_keys:
                 del self.candles[old_k]
 
@@ -63,6 +63,6 @@ class TickBuffer:
     def get_recent_ticks(self, count: int = 50) -> List[Dict[str, Any]]:
         return [asdict(t) for t in list(self.ticks)[-count:]]
 
-    def get_candles(self, limit: int = 180) -> List[Dict[str, Any]]:
+    def get_candles(self, limit: int = 2500) -> List[Dict[str, Any]]:
         sorted_times = sorted(self.candles.keys())[-limit:]
         return [asdict(self.candles[t]) for t in sorted_times]
