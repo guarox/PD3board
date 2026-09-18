@@ -446,8 +446,15 @@ class TerminalController {
   updateHeaderSpread(ob) {
     const spreadEl = document.getElementById('headerSpread');
     if (!spreadEl || !ob || !ob.bids || !ob.asks || !ob.bids.length || !ob.asks.length) return;
-    const bestBid = ob.bids[0].price.toFixed(2);
-    const bestAsk = ob.asks[0].price.toFixed(2);
+    const bid = Number(ob.bids[0].price);
+    const ask = Number(ob.asks[0].price);
+    let decimals = 2;
+    if (bid < 0.01) decimals = 6;
+    else if (bid < 0.5) decimals = 5;
+    else if (bid < 2) decimals = 4;
+    else if (bid < 20 && Math.abs(bid - Math.round(bid * 100) / 100) > 0.0001) decimals = 3;
+    const bestBid = bid.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    const bestAsk = ask.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
     spreadEl.innerText = `${bestBid} / ${bestAsk}`;
   }
 
@@ -1627,8 +1634,17 @@ class TerminalController {
 
   updateHeaderPrice(price, side) {
     const priceEl = document.getElementById('livePrice');
-    if (!priceEl) return;
-    priceEl.innerText = Number(price).toFixed(2);
+    if (!priceEl || price === null || price === undefined || isNaN(price)) return;
+    const numPrice = Number(price);
+    let decimals = 2;
+    if (numPrice < 0.01) decimals = 6;
+    else if (numPrice < 0.5) decimals = 5;
+    else if (numPrice < 2) decimals = 4;
+    else if (numPrice < 20 && Math.abs(numPrice - Math.round(numPrice * 100) / 100) > 0.0001) decimals = 3;
+    priceEl.innerText = numPrice.toLocaleString('en-US', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals
+    });
     priceEl.className = side === 'buy' ? 'tick-up' : 'tick-down';
     setTimeout(() => { priceEl.className = ''; }, 350);
   }
