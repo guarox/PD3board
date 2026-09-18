@@ -3,7 +3,7 @@ import json
 import logging
 import random
 import time
-from typing import Callable, Optional, List, Dict
+from typing import Callable, Optional, List, Dict, Any
 import websockets
 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,37 @@ class CoinbaseFeed:
             "ETH-USD": 2400.00,
             "SOL-USD": 98.00
         }
+
+    async def fetch_historical_candles(self, product_id: str = "BTC-USD", granularity: int = 60) -> List[Dict[str, Any]]:
+        """
+        Fetches up to 300 real historical candles from Coinbase Exchange REST API.
+        granularity: 60 (1m), 300 (5m), 900 (15m), 3600 (1h), 21600 (6h), 86400 (1d).
+        """
+        import aiohttp
+        url = f"https://api.exchange.coinbase.com/products/{product_id}/candles?granularity={granularity}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=4.0)) as resp:
+                    if resp.status == 200:
+                        raw = await resp.json()
+                        # Coinbase returns newest first: [ [ time, low, high, open, close, volume ], ... ]
+                        candles = []
+                        for row in reversed(raw):
+                            if len(row) >= 6:
+                                ts, low, high, open_, close_, vol = row[0], row[1], row[2], row[3], row[4], row[5]
+                                candles.append({
+                                    "time": int(ts),
+                                    "open": float(open_),
+                                    "high": float(high),
+                                    "low": float(low),
+                                    "close": float(close_),
+                                    "volume": round(float(vol), 4)
+                                })
+                        return candles
+        except Exception as e:
+            logger.debug(f"Coinbase REST historical candles fetch failed for {product_id}: {e}")
+        return []
 
     async def start(self):
         self.running = True

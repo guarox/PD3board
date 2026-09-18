@@ -356,8 +356,29 @@ async def startup_event():
     for sym in list(equities_feed.equities.keys()) + list(equities_feed.indices.keys()):
         get_or_create_tick_buffer(sym)
         get_or_create_orderbook(sym)
+
     # Start Coinbase live feed (Binance passive in US IP environment)
     await coinbase_feed.start()
+
+    # Pre-populate crypto tick buffers with historical candles from Coinbase REST
+    async def bootstrap_crypto():
+        for prod in ["BTC-USD", "ETH-USD", "SOL-USD"]:
+            candles = await coinbase_feed.fetch_historical_candles(prod, granularity=60)
+            if candles:
+                sym_base = prod.split("-")[0]
+                for target_sym in [prod.replace("-", ""), f"{sym_base}USDT", sym_base]:
+                    tb = get_or_create_tick_buffer(target_sym)
+                    for c in candles:
+                        b_time = (int(c["time"]) // 60) * 60
+                        tb.candles[b_time] = Candle(
+                            time=b_time,
+                            open=float(c["open"]),
+                            high=float(c["high"]),
+                            low=float(c["low"]),
+                            close=float(c["close"]),
+                            volume=float(c["volume"])
+                        )
+    asyncio.create_task(bootstrap_crypto())
     asyncio.create_task(equities_broadcaster())
     asyncio.create_task(news_broadcaster())
 
@@ -402,7 +423,8 @@ async def execute_command(req: CommandRequest):
         tb = get_or_create_tick_buffer(ticker)
         data = {
             "symbol": ticker,
-            "candles": tb.get_candles(),
+            "interval": "1M",
+            "candles": tb.get_candles(limit=300),
             "ticks": tb.get_recent_ticks()
         }
     elif fn == "L2":
@@ -597,14 +619,29 @@ async def get_market_status():
     }
 
 @app.get("/api/ticks/{symbol}")
-async def get_ticks(symbol: str):
-    sym = symbol.upper()
+async def get_ticks(symbol: str, interval: str = "1M"):
+    sym = symbol.upper().strip()
+    norm_interval = interval.upper() if interval else "1M"
+    if norm_interval not in {"1M", "5M", "15M", "1H", "1D"}:
+        norm_interval = "1M"
+
     tb = get_or_create_tick_buffer(sym)
-    if sym not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
-        sync_tick_buffer_with_real_candles(sym)
+    if norm_interval == "1M":
+        if sym not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
+            sync_tick_buffer_with_real_candles(sym)
+        return {
+            "symbol": sym,
+            "interval": "1M",
+            "candles": tb.get_candles(limit=300),
+            "ticks": tb.get_recent_ticks()
+        }
+
+    # For multi-timeframe intervals (5M, 15M, 1H, 1D), fetch historical candles
+    candles = equities_feed.fetch_historical_candles(sym, norm_interval)
     return {
         "symbol": sym,
-        "candles": tb.get_candles(limit=180),
+        "interval": norm_interval,
+        "candles": candles,
         "ticks": tb.get_recent_ticks()
     }
 
