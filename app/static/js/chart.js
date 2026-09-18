@@ -318,12 +318,13 @@ class PriceChart {
 
   setInterval(interval) {
     this.interval = interval;
-    if (this.rawCandles && this.rawCandles.length > 0) {
-      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
-      this.applySeriesData();
-      if (this.chart) {
-        this.chart.timeScale().scrollToRealtime();
-      }
+    if (this.chart) {
+      this.chart.applyOptions({
+        timeScale: {
+          timeVisible: this.interval !== '1D',
+          secondsVisible: false,
+        }
+      });
     }
   }
 
@@ -334,10 +335,19 @@ class PriceChart {
     this.candles = this.aggregateCandles(this.rawCandles, this.interval);
     this.currentPrice = currentPrice || (this.candles.length ? this.candles[this.candles.length - 1].close : 0);
 
+    if (this.chart) {
+      this.chart.applyOptions({
+        timeScale: {
+          timeVisible: this.interval !== '1D',
+          secondsVisible: false,
+        }
+      });
+    }
+
     this.applySeriesData();
 
     if (this.chart) {
-      this.chart.timeScale().scrollToRealtime();
+      this.chart.timeScale().fitContent();
     }
   }
 
@@ -353,51 +363,55 @@ class PriceChart {
     this.currentPrice = Number(price);
 
     const ts = timestamp ? (timestamp > 1e11 ? Math.floor(timestamp / 1000) : Math.floor(timestamp)) : Math.floor(Date.now() / 1000);
-    const minuteBucket = Math.floor(ts / 60) * 60;
 
-    if (!this.rawCandles || this.rawCandles.length === 0) {
+    let bucketDuration = 60;
+    if (this.interval === '5M') bucketDuration = 300;
+    else if (this.interval === '15M') bucketDuration = 900;
+    else if (this.interval === '1H') bucketDuration = 3600;
+    else if (this.interval === '1D') bucketDuration = 86400;
+
+    const currentBucketTime = Math.floor(ts / bucketDuration) * bucketDuration;
+
+    if (!this.candles || this.candles.length === 0) {
       const initialBar = {
-        time: minuteBucket,
+        time: currentBucketTime,
         open: this.currentPrice,
         high: this.currentPrice,
         low: this.currentPrice,
         close: this.currentPrice,
         volume: Number(size || 1)
       };
-      this.rawCandles = [initialBar];
       this.candles = [initialBar];
+      this.rawCandles = [initialBar];
       this.applySeriesData();
       return;
     }
 
-    const last = this.rawCandles[this.rawCandles.length - 1];
+    const last = this.candles[this.candles.length - 1];
     let updatedBar = null;
 
-    if (minuteBucket > last.time) {
-      // New minute bar
+    if (currentBucketTime > last.time) {
+      // New bar for the active interval
       const newBar = {
-        time: minuteBucket,
+        time: currentBucketTime,
         open: this.currentPrice,
         high: this.currentPrice,
         low: this.currentPrice,
         close: this.currentPrice,
         volume: Number(size || 1)
       };
-      this.rawCandles.push(newBar);
-      if (this.rawCandles.length > 3000) {
-        this.rawCandles.shift();
+      this.candles.push(newBar);
+      if (this.candles.length > 5000) {
+        this.candles.shift();
       }
-      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
-      updatedBar = this.candles[this.candles.length - 1];
+      updatedBar = newBar;
     } else {
       // Update existing bar
       last.high = Math.max(last.high, this.currentPrice);
       last.low = Math.min(last.low, this.currentPrice);
       last.close = this.currentPrice;
       last.volume = (last.volume || 0) + Number(size || 0);
-
-      this.candles = this.aggregateCandles(this.rawCandles, this.interval);
-      updatedBar = this.candles[this.candles.length - 1];
+      updatedBar = last;
     }
 
     // High performance O(1) live update
