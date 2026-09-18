@@ -240,11 +240,21 @@ class PriceChart {
     if (!rawCandles || rawCandles.length === 0) return [];
     if (interval === '1M') return [...rawCandles];
 
+    // Check if rawCandles is already sampled at or coarser than requested interval
+    if (rawCandles.length >= 2) {
+      const dt0 = Math.abs((rawCandles[1].time || 0) - (rawCandles[0].time || 0));
+      const dt = dt0 > 1e10 ? dt0 / 1000 : dt0;
+      if (interval === '5M' && dt >= 240) return [...rawCandles];
+      if (interval === '15M' && dt >= 700) return [...rawCandles];
+      if (interval === '1H' && dt >= 3000) return [...rawCandles];
+      if (interval === '1D' && dt >= 20000) return [...rawCandles];
+    }
+
     let groupSize = 5;
     if (interval === '5M') groupSize = 5;
     else if (interval === '15M') groupSize = 15;
     else if (interval === '1H') groupSize = 60;
-    else if (interval === '1D') groupSize = Math.max(15, Math.min(240, Math.floor(rawCandles.length / 6) || 60));
+    else if (interval === '1D') groupSize = 240;
 
     const aggregated = [];
     for (let i = 0; i < rawCandles.length; i += groupSize) {
@@ -282,8 +292,9 @@ class PriceChart {
     this.render();
   }
 
-  setData(symbol, candles, currentPrice) {
+  setData(symbol, candles, currentPrice, interval = null) {
     this.symbol = symbol;
+    if (interval) this.interval = interval;
     this.rawCandles = candles || [];
     this.candles = this.aggregateCandles(this.rawCandles, this.interval);
     this.currentPrice = currentPrice || (this.candles.length ? this.candles[this.candles.length - 1].close : 0);
@@ -573,11 +584,21 @@ class PriceChart {
 
         const tsSec = c.time > 1e11 ? Math.floor(c.time / 1000) : Math.floor(c.time);
         const d = new Date(tsSec * 1000);
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
+        let timeLabel = '';
+        if (this.interval === '1D') {
+          const m = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+          timeLabel = `${m} ${d.getDate()}`;
+        } else if (this.interval === '1H') {
+          const m = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+          timeLabel = `${m} ${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:00`;
+        } else {
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          timeLabel = `${hh}:${mm}`;
+        }
         ctx.font = '9px monospace';
         ctx.fillStyle = '#886200';
-        ctx.fillText(`${hh}:${mm}`, Math.max(0, Math.min(plotWidth - 30, wickX - 14)), marginTop + pricePlotHeight + 14);
+        ctx.fillText(timeLabel, Math.max(0, Math.min(plotWidth - 55, wickX - 16)), marginTop + pricePlotHeight + 14);
       }
 
       // Scaled Volume bar at bottom of price plot
@@ -932,12 +953,22 @@ class PriceChart {
         if (c.time) {
           const tsSec = c.time > 1e11 ? Math.floor(c.time / 1000) : Math.floor(c.time);
           const d = new Date(tsSec * 1000);
-          const hh = String(d.getHours()).padStart(2, '0');
-          const mm = String(d.getMinutes()).padStart(2, '0');
+          let hudTime = '';
+          if (this.interval === '1D') {
+            const m = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+            hudTime = `${m} ${d.getDate()}, ${d.getFullYear()}`;
+          } else if (this.interval === '1H') {
+            const m = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'][d.getMonth()];
+            hudTime = `${m} ${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+          } else {
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            hudTime = `${hh}:${mm}`;
+          }
           ctx.fillStyle = '#888';
           ctx.fillText('TIME:', tx, 16); tx += 32;
           ctx.fillStyle = '#00e5ff';
-          ctx.fillText(`${hh}:${mm}`, tx, 16);
+          ctx.fillText(hudTime, tx, 16);
         }
       }
     } else {
@@ -949,7 +980,8 @@ class PriceChart {
 
       ctx.font = 'bold 11px monospace';
       ctx.fillStyle = '#ffb000';
-      let title = `${this.symbol} [${this.interval}] INTRADAY ACTION (60 FPS)`;
+      const timeframeTitle = this.interval === '1D' ? 'DAILY HISTORICAL (1Y)' : (this.interval === '1H' ? 'HOURLY TREND (3M)' : (this.interval === '15M' ? '15M TREND (1M)' : (this.interval === '5M' ? '5M INTRADAY (5D)' : '1M INTRADAY ACTION (60 FPS)')));
+      let title = `${this.symbol} [${this.interval}] ${timeframeTitle}`;
       const activeInds = Object.keys(this.indicators).filter(k => this.indicators[k]);
       if (activeInds.length > 0) {
         title += ` // ${activeInds.join(', ')}`;

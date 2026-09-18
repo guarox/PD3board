@@ -47,3 +47,15 @@ def test_multi_source_candles_and_precision():
         assert len(ob.bids) > 0, f"Expected bids for {sym}"
         assert len(ob.asks) > 0, f"Expected asks for {sym}"
         assert ob.bids[0].price < ob.asks[0].price, f"Spread inverted for {sym}: {ob.bids[0].price} vs {ob.asks[0].price}"
+
+def test_multi_timeframe_historical_candles():
+    feed = EquitiesFeed()
+    for interval in ["1M", "5M", "15M", "1H", "1D"]:
+        candles = feed.fetch_historical_candles("AAPL", interval=interval)
+        assert len(candles) >= 30, f"Expected at least 30 candles for AAPL {interval}, got {len(candles)}"
+        # Verify timestamps are in strictly ascending order
+        for i in range(1, len(candles)):
+            assert candles[i]["time"] > candles[i - 1]["time"], f"Timestamps out of order for {interval}"
+            assert candles[i]["high"] >= candles[i]["low"]
+            assert candles[i]["open"] > 0
+            assert candles[i]["close"] > 0

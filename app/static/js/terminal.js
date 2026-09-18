@@ -115,9 +115,11 @@ class TerminalController {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.btn-interval').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        const interval = btn.dataset.interval;
         if (this.priceChart) {
-          this.priceChart.setInterval(btn.dataset.interval);
+          this.priceChart.setInterval(interval);
         }
+        this.loadHistoricalData(this.currentTicker, interval);
         this.sound.playKeyClick();
       });
     });
@@ -458,13 +460,14 @@ class TerminalController {
     spreadEl.innerText = `${bestBid} / ${bestAsk}`;
   }
 
-  async loadHistoricalData(ticker) {
+  async loadHistoricalData(ticker, interval = null) {
     try {
-      const res = await fetch(`/api/ticks/${ticker}`);
+      const activeInterval = interval || (this.priceChart ? this.priceChart.interval : '1M');
+      const res = await fetch(`/api/ticks/${ticker}?interval=${activeInterval}`);
       if (res.ok) {
         const data = await res.json();
         if (this.priceChart && data.candles && this.currentTicker === ticker) {
-          this.priceChart.setData(ticker, data.candles);
+          this.priceChart.setData(ticker, data.candles, null, activeInterval);
           if (data.candles.length > 0) {
             const last = data.candles[data.candles.length - 1];
             this.updateHeaderPrice(last.close, last.close >= last.open ? 'buy' : 'sell');

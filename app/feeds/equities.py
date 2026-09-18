@@ -261,6 +261,7 @@ class EquitiesFeed:
     """
     def __init__(self):
         self.live_cache: Dict[str, Dict[str, Any]] = {}
+        self.historical_cache: Dict[str, Dict[str, Any]] = {}
         self.simulated_prices: Dict[str, float] = {}
 
         self.indices: Dict[str, Dict[str, Any]] = {
@@ -499,11 +500,165 @@ class EquitiesFeed:
             logger.debug(f"Live market quote fetch failed for {symbol}: {e}")
             return None
 
+    def fetch_historical_candles(self, symbol: str, interval: str = "1M") -> List[Dict[str, Any]]:
+        """
+        Fetches true multi-timeframe historical candles for the given interval:
+        - 1M  -> interval=1m,  range=1d (or 5d for forex/crypto)
+        - 5M  -> interval=5m,  range=5d
+        - 15M -> interval=15m, range=1mo
+        - 1H  -> interval=60m, range=3mo
+        - 1D  -> interval=1d,  range=1y
+        """
+        sym = symbol.upper().strip()
+        norm_interval = interval.upper() if interval else "1M"
+        if norm_interval not in {"1M", "5M", "15M", "1H", "1D"}:
+            norm_interval = "1M"
+
+        cache_key = f"{sym}_{norm_interval}"
+        now = time.time()
+        if cache_key in self.historical_cache and self.historical_cache[cache_key]["expires"] > now:
+            return self.historical_cache[cache_key]["candles"]
+
+        config_map = {
+            "1M": ("1m", "1d", 20.0),
+            "5M": ("5m", "5d", 60.0),
+            "15M": ("15m", "1mo", 180.0),
+            "1H": ("60m", "3mo", 300.0),
+            "1D": ("1d", "1y", 1800.0),
+        }
+        yf_interval, yf_range, cache_ttl = config_map[norm_interval]
+
+        target = SYMBOL_MAP.get(sym, sym)
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}?interval={yf_interval}&range={yf_range}"
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=4.0) as res:
+                payload = json.loads(res.read().decode())
+                chart = payload.get("chart", {})
+                res_list = chart.get("result")
+                if res_list:
+                    res_obj = res_list[0]
+                    timestamps = res_obj.get("timestamp", [])
+                    indicators = res_obj.get("indicators", {}).get("quote", [{}])[0]
+
+                    candles = []
+                    opens = indicators.get("open", [])
+                    highs = indicators.get("high", [])
+                    lows = indicators.get("low", [])
+                    closes = indicators.get("close", [])
+                    volumes = indicators.get("volume", [])
+
+                    for i, ts in enumerate(timestamps):
+                        if i < len(opens) and i < len(closes):
+                            o = opens[i]
+                            h = highs[i]
+                            l = lows[i]
+                            c = closes[i]
+                            v = volumes[i] if i < len(volumes) and volumes[i] is not None else 0
+                            if None not in (o, h, l, c):
+                                fv_o, fv_h, fv_l, fv_c = float(o), float(h), float(l), float(c)
+                                dec = 6 if fv_c < 0.01 else (5 if fv_c < 0.5 else (4 if fv_c < 2.0 else (3 if fv_c < 20.0 else 2)))
+                                candles.append({
+                                    "time": int(ts),
+                                    "open": round(fv_o, dec),
+                                    "high": round(fv_h, dec),
+                                    "low": round(fv_l, dec),
+                                    "close": round(fv_c, dec),
+                                    "volume": round(float(v), 1)
+                                })
+
+                    if candles:
+                        self.historical_cache[cache_key] = {
+                            "candles": candles,
+                            "expires": now + cache_ttl
+                        }
+                        return candles
+        except Exception as e:
+            logger.debug(f"Historical candle fetch failed for {symbol} ({norm_interval}): {e}")
+
+        # Fallback to simulated multi-timeframe candles tailored to interval
+        candles = self._generate_fallback_candles(sym, norm_interval)
+        self.historical_cache[cache_key] = {
+            "candles": candles,
+            "expires": now + 60.0
+        }
+        return candles
+
+    def _generate_fallback_candles(self, symbol: str, interval: str) -> List[Dict[str, Any]]:
+        expected_price = self.get_security_price(symbol, prefer_live=True)
+        base_price = expected_price if expected_price > 0 else 100.0
+
+        if base_price < 0.01:
+            dec = 6
+        elif base_price < 0.5:
+            dec = 5
+        elif base_price < 2.0:
+            dec = 4
+        elif base_price < 20.0:
+            dec = 3
+        else:
+            dec = 2
+
+        now_ts = int(time.time())
+        step_seconds = 60
+        num_candles = 90
+        volatility_scale = 0.0006
+
+        if interval == "5M":
+            step_seconds = 300
+            num_candles = 120
+            volatility_scale = 0.0012
+        elif interval == "15M":
+            step_seconds = 900
+            num_candles = 140
+            volatility_scale = 0.0025
+        elif interval == "1H":
+            step_seconds = 3600
+            num_candles = 160
+            volatility_scale = 0.0050
+        elif interval == "1D":
+            step_seconds = 86400
+            num_candles = 250
+            volatility_scale = 0.0150
+
+        import random
+        rng = random.Random(hash(f"{symbol}_{interval}") & 0xFFFFFFFF)
+        step = max(10 ** (-dec), base_price * volatility_scale)
+
+        candles = []
+        curr = base_price * (1.0 - (num_candles * 0.0005))
+        for idx in range(num_candles):
+            c_time = now_ts - (num_candles - 1 - idx) * step_seconds
+            drift = (rng.random() - 0.49) * step
+            mean_rev = (base_price - curr) * 0.03
+            next_val = round(curr + drift + mean_rev, dec)
+
+            c_open = round(curr, dec)
+            c_close = next_val
+            body_min = min(c_open, c_close)
+            body_max = max(c_open, c_close)
+            wick_up = round(rng.uniform(0.1, 0.4) * step, dec)
+            wick_dn = round(rng.uniform(0.1, 0.4) * step, dec)
+            c_high = round(body_max + wick_up, dec)
+            c_low = round(max(body_min - wick_dn, 0.000001), dec)
+            c_vol = round(rng.uniform(5000.0, 500000.0) if interval == "1D" else rng.uniform(200.0, 3000.0), 1)
+
+            candles.append({
+                "time": c_time,
+                "open": c_open,
+                "high": c_high,
+                "low": c_low,
+                "close": c_close,
+                "volume": c_vol
+            })
+            curr = next_val
+
+        return candles
+
     def get_historical_candles(self, symbol: str) -> List[Dict[str, Any]]:
-        quote = self.fetch_live_quote(symbol)
-        if quote and quote.get("candles"):
-            return quote["candles"]
-        return []
+        return self.fetch_historical_candles(symbol, "1M")
 
     def get_market_sessions(self) -> Dict[str, str]:
         """Calculates current trading session status for major global exchanges."""
