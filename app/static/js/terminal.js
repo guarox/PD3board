@@ -93,7 +93,8 @@ class TerminalController {
     // Periodic background sync to keep candlestick chart aligned with server state
     setInterval(() => {
       if (this.priceChart && this.currentTicker && this.currentFunction === 'GP') {
-        fetch(`/api/ticks/${this.currentTicker}`)
+        const activeInterval = this.priceChart.interval || '1M';
+        fetch(`/api/ticks/${this.currentTicker}?interval=${activeInterval}`)
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             if (data && data.candles && this.priceChart && this.currentFunction === 'GP') {
@@ -526,7 +527,10 @@ class TerminalController {
         this.updateActiveSecurityBadge();
 
         if (resp.data && resp.data.candles && resp.data.candles.length > 0) {
-          if (this.priceChart) this.priceChart.setData(this.currentTicker, resp.data.candles);
+          const curInt = this.priceChart ? this.priceChart.interval : '1M';
+          if (this.priceChart && (!curInt || curInt === '1M')) {
+            this.priceChart.setData(this.currentTicker, resp.data.candles, null, '1M');
+          }
           const lastCandle = resp.data.candles[resp.data.candles.length - 1];
           this.updateHeaderPrice(lastCandle.close, lastCandle.close >= lastCandle.open ? 'buy' : 'sell');
         }
