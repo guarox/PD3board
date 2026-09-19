@@ -253,6 +253,34 @@ PRIVATE_SECURITIES: Dict[str, Dict[str, Any]] = {
     }
 }
 
+PEER_BASELINES: Dict[str, Dict[str, Any]] = {
+    "MCD": {"name": "McDonald's Corp", "price": 248.24, "pe": 20.2, "fwd_pe": 17.8, "ev_ebitda": 15.4, "ps": 6.3, "op_margin": "46.5%", "roe": "N/A", "div_yield": "3.11%"},
+    "YUM": {"name": "Yum! Brands Inc", "price": 137.99, "pe": 17.4, "fwd_pe": 19.7, "ev_ebitda": 16.4, "ps": 4.3, "op_margin": "32.8%", "roe": "N/A", "div_yield": "2.17%"},
+    "QSR": {"name": "Restaurant Brands Intl", "price": 72.88, "pe": 18.3, "fwd_pe": 16.4, "ev_ebitda": 14.2, "ps": 3.4, "op_margin": "27.7%", "roe": "34.8%", "div_yield": "3.57%"},
+    "WEN": {"name": "Wendy's Co", "price": 6.74, "pe": 10.2, "fwd_pe": 12.9, "ev_ebitda": 11.0, "ps": 0.6, "op_margin": "14.3%", "roe": "108.0%", "div_yield": "4.16%"},
+    "SBUX": {"name": "Starbucks Corp", "price": 95.83, "pe": 55.4, "fwd_pe": 30.7, "ev_ebitda": 22.7, "ps": 2.8, "op_margin": "12.9%", "roe": "N/A", "div_yield": "2.59%"},
+    "NVDA": {"name": "Nvidia Corp", "price": 118.90, "pe": 45.2, "fwd_pe": 32.1, "ev_ebitda": 26.5, "ps": 17.7, "op_margin": "66.2%", "roe": "117.2%", "div_yield": "0.45%"},
+    "AMD": {"name": "Advanced Micro Devices", "price": 152.80, "pe": 112.5, "fwd_pe": 28.4, "ev_ebitda": 94.7, "ps": 22.1, "op_margin": "17.2%", "roe": "10.2%", "div_yield": "0.00%"},
+    "INTC": {"name": "Intel Corp", "price": 20.80, "pe": "N/A", "fwd_pe": 18.5, "ev_ebitda": 34.7, "ps": 10.1, "op_margin": "12.2%", "roe": "-10.7%", "div_yield": "0.00%"},
+    "TSM": {"name": "Taiwan Semiconductor", "price": 174.20, "pe": 28.1, "fwd_pe": 22.5, "ev_ebitda": 4.9, "ps": 0.5, "op_margin": "60.3%", "roe": "40.0%", "div_yield": "0.94%"},
+    "AVGO": {"name": "Broadcom Inc", "price": 168.40, "pe": 65.2, "fwd_pe": 27.8, "ev_ebitda": 33.3, "ps": 19.2, "op_margin": "54.3%", "roe": "44.2%", "div_yield": "0.73%"},
+    "AAPL": {"name": "Apple Inc", "price": 228.40, "pe": 33.8, "fwd_pe": 29.5, "ev_ebitda": 29.3, "ps": 10.5, "op_margin": "32.6%", "roe": "148.8%", "div_yield": "0.32%"},
+    "MSFT": {"name": "Microsoft Corp", "price": 425.20, "pe": 35.2, "fwd_pe": 31.0, "ev_ebitda": 24.1, "ps": 12.8, "op_margin": "44.6%", "roe": "38.5%", "div_yield": "0.75%"},
+    "GOOGL": {"name": "Alphabet Inc", "price": 182.10, "pe": 24.6, "fwd_pe": 21.2, "ev_ebitda": 18.2, "ps": 6.9, "op_margin": "32.0%", "roe": "31.2%", "div_yield": "0.44%"},
+    "AMZN": {"name": "Amazon.com Inc", "price": 186.50, "pe": 42.1, "fwd_pe": 34.5, "ev_ebitda": 17.5, "ps": 3.4, "op_margin": "10.8%", "roe": "21.5%", "div_yield": "0.00%"},
+    "META": {"name": "Meta Platforms Inc", "price": 580.40, "pe": 27.8, "fwd_pe": 24.0, "ev_ebitda": 16.8, "ps": 8.7, "op_margin": "41.2%", "roe": "36.4%", "div_yield": "0.35%"},
+    "JPM": {"name": "JPMorgan Chase & Co", "price": 215.30, "pe": 12.4, "fwd_pe": 11.8, "ev_ebitda": 12.8, "ps": 3.6, "op_margin": "39.4%", "roe": "16.8%", "div_yield": "2.25%"},
+    "BAC": {"name": "Bank of America Corp", "price": 39.50, "pe": 13.8, "fwd_pe": 11.2, "ev_ebitda": 11.2, "ps": 2.8, "op_margin": "31.2%", "roe": "10.4%", "div_yield": "2.55%"},
+    "WFC": {"name": "Wells Fargo & Co", "price": 56.40, "pe": 12.1, "fwd_pe": 10.5, "ev_ebitda": 10.5, "ps": 2.4, "op_margin": "28.5%", "roe": "11.2%", "div_yield": "2.75%"},
+    "GS": {"name": "Goldman Sachs Group", "price": 490.20, "pe": 15.6, "fwd_pe": 12.5, "ev_ebitda": 13.4, "ps": 3.1, "op_margin": "33.8%", "roe": "12.9%", "div_yield": "2.40%"},
+    "MS": {"name": "Morgan Stanley", "price": 102.80, "pe": 16.2, "fwd_pe": 13.1, "ev_ebitda": 12.1, "ps": 2.9, "op_margin": "30.4%", "roe": "13.5%", "div_yield": "3.10%"},
+    "TSLA": {"name": "Tesla Inc", "price": 240.50, "pe": 62.4, "fwd_pe": 54.0, "ev_ebitda": 48.2, "ps": 7.4, "op_margin": "8.2%", "roe": "14.1%", "div_yield": "0.00%"},
+    "F": {"name": "Ford Motor Co", "price": 10.80, "pe": 11.5, "fwd_pe": 7.2, "ev_ebitda": 8.5, "ps": 0.3, "op_margin": "4.1%", "roe": "9.8%", "div_yield": "5.60%"},
+    "GM": {"name": "General Motors Co", "price": 48.50, "pe": 5.4, "fwd_pe": 4.9, "ev_ebitda": 6.8, "ps": 0.4, "op_margin": "6.5%", "roe": "14.2%", "div_yield": "1.05%"},
+    "RIVN": {"name": "Rivian Automotive", "price": 13.20, "pe": "N/A", "fwd_pe": "N/A", "ev_ebitda": "N/A", "ps": 2.1, "op_margin": "-78.4%", "roe": "-45.2%", "div_yield": "0.00%"},
+    "TM": {"name": "Toyota Motor Corp", "price": 178.60, "pe": 8.2, "fwd_pe": 8.0, "ev_ebitda": 9.1, "ps": 0.8, "op_margin": "11.4%", "roe": "13.6%", "div_yield": "3.20%"}
+}
+
 class EquitiesFeed:
     """
     World Equity Indices (WEI) and US Equities data provider.
@@ -1496,11 +1524,40 @@ class EquitiesFeed:
     async def get_relative_valuation_async(self, symbol: str) -> Dict[str, Any]:
         sym = symbol.upper()
         if self._is_crypto(sym):
-            return self.get_relative_valuation(sym)
+            crypto_peers = ["ETHUSDT", "BTCUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
+            peers = []
+            for cp in crypto_peers:
+                coin_id = "ethereum" if "ETH" in cp else ("bitcoin" if "BTC" in cp else ("solana" if "SOL" in cp else ("binancecoin" if "BNB" in cp else "avalanche-2")))
+                tokenomics = await market_data_client.get_crypto_tokenomics(coin_id)
+                price = tokenomics.get("price_usd", 0.0) if tokenomics else 0.0
+                staking_apr = "3.2% (Staking)" if "ETH" in cp else ("6.8% (Staking)" if "SOL" in cp else ("5.5% (Staking)" if "AVAX" in cp else "N/A"))
+                mkt_cap_b = f"${round(tokenomics.get('market_cap', 0) / 1e9, 1)}B" if tokenomics else "N/A"
+                peers.append({
+                    "symbol": cp,
+                    "name": tokenomics.get("name", cp) if tokenomics else cp,
+                    "price": round(float(price), 2),
+                    "pe": "N/A",
+                    "fwd_pe": "N/A",
+                    "ev_ebitda": mkt_cap_b,
+                    "ps": "N/A",
+                    "op_margin": "N/A",
+                    "roe": staking_apr,
+                    "div_yield": staking_apr if "Staking" in staking_apr else "0.00%"
+                })
+            return {
+                "symbol": sym,
+                "industry": "Layer 1 Smart Contract Protocols & Digital Assets",
+                "peers": peers
+            }
 
-        tech_peers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA"]
+        tech_peers = ["AAPL", "MSFT", "GOOGL", "AMZN", "META"]
         qsr_peers = ["MCD", "YUM", "QSR", "WEN", "SBUX"]
         semi_peers = ["NVDA", "AMD", "INTC", "TSM", "AVGO"]
+        fin_peers = ["JPM", "BAC", "WFC", "GS", "MS"]
+        auto_peers = ["TSLA", "F", "GM", "RIVN", "TM"]
+        health_peers = ["LLY", "UNH", "JNJ", "ABBV", "MRK"]
+        energy_peers = ["XOM", "CVX", "COP", "SLB", "EOG"]
+        retail_peers = ["WMT", "COST", "TGT", "HD", "LOW"]
 
         if sym in qsr_peers:
             peer_syms = qsr_peers
@@ -1508,39 +1565,120 @@ class EquitiesFeed:
         elif sym in semi_peers:
             peer_syms = semi_peers
             industry = "Semiconductors & AI Compute"
+        elif sym in tech_peers:
+            peer_syms = tech_peers
+            industry = "Mega-Cap Technology & Platforms"
+        elif sym in fin_peers:
+            peer_syms = fin_peers
+            industry = "Diversified Banking & Financial Services"
+        elif sym in auto_peers:
+            peer_syms = auto_peers
+            industry = "Automotive & Electric Vehicles"
+        elif sym in health_peers:
+            peer_syms = health_peers
+            industry = "Pharmaceuticals & Healthcare"
+        elif sym in energy_peers:
+            peer_syms = energy_peers
+            industry = "Integrated Oil, Gas & Energy"
+        elif sym in retail_peers:
+            peer_syms = retail_peers
+            industry = "Consumer Retail & Merchandising"
         else:
-            peer_syms = [sym, "AAPL", "MSFT", "NVDA", "GOOGL"]
+            peer_syms = [sym, "AAPL", "MSFT", "NVDA", "AMZN"]
             industry = "Comparative Benchmark Group"
 
-        quotes = await market_data_client.get_quotes(peer_syms)
-        if quotes:
-            peers = []
-            for q in quotes:
-                p_sym = q.get("symbol", "")
-                p_name = q.get("shortName", p_sym)
-                price = round(float(q.get("regularMarketPrice", 100.0)), 2)
-                pe = round(float(q.get("trailingPE", 22.0)), 1) if q.get("trailingPE") else "N/A"
-                fwd_pe = round(float(q.get("forwardPE", 19.0)), 1) if q.get("forwardPE") else "N/A"
-                ps = round(float(q.get("priceToSalesTrailing12Months", 4.0)), 1) if q.get("priceToSalesTrailing12Months") else "N/A"
-                peers.append({
-                    "symbol": p_sym,
-                    "name": p_name,
-                    "price": price,
-                    "pe": pe,
-                    "fwd_pe": fwd_pe,
-                    "ev_ebitda": 16.5,
-                    "ps": ps,
-                    "op_margin": "28.5%",
-                    "roe": "24.0%",
-                    "div_yield": "1.50%"
-                })
-            return {
-                "symbol": sym,
-                "industry": industry,
-                "peers": peers
-            }
+        if sym not in peer_syms:
+            peer_syms = [sym] + peer_syms[:4]
 
-        return self.get_relative_valuation(sym)
+        quotes_task = market_data_client.get_quotes(peer_syms)
+        summaries_tasks = [
+            market_data_client.get_quote_summary(
+                s, ["financialData", "defaultKeyStatistics", "summaryDetail"]
+            )
+            for s in peer_syms
+        ]
+
+        gathered = await asyncio.gather(quotes_task, *summaries_tasks, return_exceptions=True)
+        quotes = gathered[0] if len(gathered) > 0 and isinstance(gathered[0], list) else []
+        summaries = gathered[1:] if len(gathered) > 1 else []
+
+        quote_map = {}
+        for q in quotes:
+            if isinstance(q, dict):
+                quote_map[q.get("symbol", "").upper()] = q
+
+        summary_map = {}
+        for s_sym, summary in zip(peer_syms, summaries):
+            if isinstance(summary, dict):
+                summary_map[s_sym.upper()] = summary
+
+        if not quote_map and not summary_map:
+            return self.get_relative_valuation(sym)
+
+        peers = []
+        for p_sym in peer_syms:
+            q = quote_map.get(p_sym.upper(), {})
+            s = summary_map.get(p_sym.upper(), {})
+            fd = s.get("financialData", {})
+            ks = s.get("defaultKeyStatistics", {})
+            sd = s.get("summaryDetail", {})
+            base = PEER_BASELINES.get(p_sym.upper(), {})
+
+            p_name = q.get("shortName") or q.get("longName") or base.get("name", f"{p_sym} Corp")
+            price = round(float(q.get("regularMarketPrice", base.get("price", 100.0))), 2)
+            
+            pe_val = q.get("trailingPE") or sd.get("trailingPE", {}).get("raw") or base.get("pe")
+            pe = round(float(pe_val), 1) if pe_val is not None and pe_val != "N/A" else "N/A"
+            
+            fwd_pe_val = q.get("forwardPE") or sd.get("forwardPE", {}).get("raw") or base.get("fwd_pe")
+            fwd_pe = round(float(fwd_pe_val), 1) if fwd_pe_val is not None and fwd_pe_val != "N/A" else "N/A"
+
+            ev_val = ks.get("enterpriseToEbitda", {}).get("raw") or base.get("ev_ebitda")
+            ev_ebitda = round(float(ev_val), 1) if ev_val is not None and ev_val != "N/A" else "N/A"
+
+            ps_val = sd.get("priceToSalesTrailing12Months", {}).get("raw") or ks.get("priceToSalesTrailing12Months", {}).get("raw") or q.get("priceToSalesTrailing12Months") or base.get("ps")
+            ps = round(float(ps_val), 1) if ps_val is not None and ps_val != "N/A" else "N/A"
+
+            op_m_val = fd.get("operatingMargins", {}).get("raw")
+            if op_m_val is not None:
+                op_margin = f"{round(float(op_m_val) * 100, 1)}%"
+            else:
+                op_margin = base.get("op_margin", "N/A")
+
+            roe_val = fd.get("returnOnEquity", {}).get("raw")
+            if roe_val is not None:
+                roe = f"{round(float(roe_val) * 100, 1)}%"
+            else:
+                roe = base.get("roe", "N/A")
+
+            div_val = sd.get("dividendYield", {}).get("raw") or q.get("dividendYield")
+            if div_val is not None:
+                div_float = float(div_val)
+                if div_float > 1.0:
+                    div_yield = f"{round(div_float, 2)}%"
+                else:
+                    div_yield = f"{round(div_float * 100, 2)}%"
+            else:
+                div_yield = base.get("div_yield", "0.00%")
+
+            peers.append({
+                "symbol": p_sym,
+                "name": p_name,
+                "price": price,
+                "pe": pe,
+                "fwd_pe": fwd_pe,
+                "ev_ebitda": ev_ebitda,
+                "ps": ps,
+                "op_margin": op_margin,
+                "roe": roe,
+                "div_yield": div_yield
+            })
+
+        return {
+            "symbol": sym,
+            "industry": industry,
+            "peers": peers
+        }
 
     async def get_earnings_estimates_async(self, symbol: str) -> Dict[str, Any]:
         sym = symbol.upper()
