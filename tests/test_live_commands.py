@@ -106,10 +106,34 @@ async def test_command_eco():
     assert "indicator" in events[0]
 
 @pytest.mark.asyncio
+async def test_command_anr():
+    res = await execute_command(CommandRequest(command="AAPL ANR <GO>"))
+    assert res["success"] is True
+    anr = res["data"]
+    assert anr["symbol"] == "AAPL"
+    assert "consensus" in anr
+    assert "mean_target" in anr
+    assert anr["ratings_breakdown"]["Buy"] > 0
+    assert len(anr["recent_actions"]) >= 1
+    assert "target" in anr["recent_actions"][0]
+
+@pytest.mark.asyncio
+async def test_command_ee():
+    res = await execute_command(CommandRequest(command="AAPL EE <GO>"))
+    assert res["success"] is True
+    ee = res["data"]
+    assert ee["symbol"] == "AAPL"
+    assert "quarterly_history" in ee
+    assert len(ee["quarterly_history"]) >= 2
+    assert "reported_eps" in ee["quarterly_history"][0]
+
+@pytest.mark.asyncio
 async def test_command_world_macro():
     wirp = await execute_command(CommandRequest(command="WIRP"))
     assert wirp["success"] is True
     assert "meetings" in wirp["data"]
+    assert wirp["data"]["current_target_rate"] == "4.75% - 5.00%"
+    assert "%" in wirp["data"]["effective_fed_funds_rate"]
 
     wcrs = await execute_command(CommandRequest(command="WCRS"))
     assert wcrs["success"] is True
@@ -128,6 +152,13 @@ async def test_command_omon():
     assert "chain" in opts
     assert len(opts["chain"]) >= 5
     assert "max_pain_strike" in opts
+
+    # Verify crypto options dynamic spot price anchoring
+    res_eth = await execute_command(CommandRequest(command="ETHUSDT OMON <GO>"))
+    assert res_eth["success"] is True
+    opts_eth = res_eth["data"]
+    assert opts_eth["spot_price"] > 2000.0
+    assert opts_eth["chain"][0]["strike"] > 1500.0
 
 @pytest.mark.asyncio
 async def test_command_maps():

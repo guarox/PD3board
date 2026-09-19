@@ -8,6 +8,8 @@ from typing import Dict, Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
+from app.feeds.market_data_client import market_data_client
+
 COMMODITY_MAPPING = [
     {"symbol": "CL1", "yahoo": "CL=F", "name": "WTI CRUDE OIL", "category": "ENERGY", "unit": "USD/bbl", "default_price": 70.18},
     {"symbol": "CO1", "yahoo": "BZ=F", "name": "BRENT CRUDE", "category": "ENERGY", "unit": "USD/bbl", "default_price": 73.65},
@@ -55,49 +57,49 @@ class WorldMacroFeed:
         today = datetime.date.today()
         all_meetings = [
             {
-                "date": "2026-09-18",
-                "implied_rate": "5.08%",
-                "prob_cut_25bp": 85.0,
-                "prob_cut_50bp": 15.0,
-                "prob_hold": 0.0,
-                "prob_hike": 0.0,
-                "bias": "EASING (25-50 BPS)"
-            },
-            {
-                "date": "2026-11-06",
-                "implied_rate": "4.82%",
-                "prob_cut_25bp": 68.4,
-                "prob_cut_50bp": 31.6,
-                "prob_hold": 0.0,
-                "prob_hike": 0.0,
-                "bias": "EASING (50-75 BPS CUMULATIVE)"
-            },
-            {
-                "date": "2026-12-18",
+                "date": "2026-11-05",
                 "implied_rate": "4.55%",
-                "prob_cut_25bp": 58.0,
-                "prob_cut_50bp": 42.0,
+                "prob_cut_25bp": 72.0,
+                "prob_cut_50bp": 28.0,
                 "prob_hold": 0.0,
                 "prob_hike": 0.0,
-                "bias": "EASING (100 BPS CUMULATIVE)"
+                "bias": "EASING CYCLE (25-50 BPS)"
             },
             {
-                "date": "2027-01-29",
+                "date": "2026-12-16",
                 "implied_rate": "4.30%",
-                "prob_cut_25bp": 52.5,
-                "prob_cut_50bp": 47.5,
+                "prob_cut_25bp": 64.0,
+                "prob_cut_50bp": 36.0,
+                "prob_hold": 0.0,
+                "prob_hike": 0.0,
+                "bias": "EASING CYCLE (75 BPS CUMULATIVE)"
+            },
+            {
+                "date": "2027-01-27",
+                "implied_rate": "4.05%",
+                "prob_cut_25bp": 55.0,
+                "prob_cut_50bp": 45.0,
+                "prob_hold": 0.0,
+                "prob_hike": 0.0,
+                "bias": "EASING CYCLE (100 BPS CUMULATIVE)"
+            },
+            {
+                "date": "2027-03-17",
+                "implied_rate": "3.85%",
+                "prob_cut_25bp": 50.0,
+                "prob_cut_50bp": 50.0,
                 "prob_hold": 0.0,
                 "prob_hike": 0.0,
                 "bias": "TERMINAL RATE PROJECTION"
             },
             {
-                "date": "2027-03-19",
-                "implied_rate": "4.15%",
+                "date": "2027-05-05",
+                "implied_rate": "3.65%",
                 "prob_cut_25bp": 45.0,
                 "prob_cut_50bp": 55.0,
                 "prob_hold": 0.0,
                 "prob_hike": 0.0,
-                "bias": "EASING CYCLE CONTINUATION"
+                "bias": "NEUTRAL STANCE EVALUATION"
             }
         ]
 
@@ -111,14 +113,14 @@ class WorldMacroFeed:
                 active_meetings.append(item)
 
         if not active_meetings:
-            active_meetings = [dict(all_meetings[0], days_forward=1)]
+            active_meetings = [dict(all_meetings[0], days_forward=30)]
 
         return {
-            "current_target_rate": "5.25% - 5.50%",
-            "effective_fed_funds_rate": "5.33%",
+            "current_target_rate": "4.75% - 5.00%",
+            "effective_fed_funds_rate": "4.83%",
             "calculation_date": today.isoformat(),
             "meetings": active_meetings[:4],
-            "terminal_rate": "3.85% (Q3 2027)"
+            "terminal_rate": "3.65% (Q2 2027)"
         }
 
     def _fetch_yahoo_meta(self, symbol: str) -> Optional[Dict[str, Any]]:
@@ -134,8 +136,7 @@ class WorldMacroFeed:
 
     def get_wcrs(self) -> List[Dict[str, Any]]:
         """
-        World Currency Ranker (WCRS).
-        Ranks global currencies by real-time intraday performance relative to USD.
+        World Currency Ranker (WCRS) synchronous fallback.
         """
         now = time.time()
         if self.cached_wcrs and (now - self.wcrs_last_fetch < self.cache_ttl):
@@ -160,7 +161,6 @@ class WorldMacroFeed:
                 chg_pct = 0.0
                 range_52w = "N/A"
 
-            # Dynamic market bias
             if chg_pct >= 0.4:
                 bias = "STRONG BID / RALLY"
             elif chg_pct >= 0.15:
@@ -189,9 +189,7 @@ class WorldMacroFeed:
 
     def get_fdm(self) -> List[Dict[str, Any]]:
         """
-        Global Commodities & Energy Matrix (FDM).
-        Energy, Precious Metals, Industrial Metals, and Agriculture.
-        Pulls real-time futures quotes from Yahoo Finance.
+        Global Commodities & Energy Matrix (FDM) synchronous fallback.
         """
         now = time.time()
         if self.cached_fdm and (now - self.fdm_last_fetch < self.cache_ttl):
@@ -226,11 +224,119 @@ class WorldMacroFeed:
         return results
 
     async def get_wirp_async(self) -> Dict[str, Any]:
-        return self.get_wirp()
+        """
+        Asynchronous live WIRP feed incorporating live money-market / T-bill rates.
+        """
+        base = self.get_wirp()
+        try:
+            irx_quotes = await market_data_client.get_quotes(["^IRX"])
+            if irx_quotes and irx_quotes[0].get("regularMarketPrice") is not None:
+                live_3m = round(float(irx_quotes[0]["regularMarketPrice"]), 2)
+                base["effective_fed_funds_rate"] = f"{live_3m}%"
+        except Exception as e:
+            logger.debug("Failed to enrich WIRP with live ^IRX rate: %s", e)
+        return base
 
     async def get_wcrs_async(self) -> List[Dict[str, Any]]:
-        return self.get_wcrs()
+        """
+        World Currency Ranker (WCRS) async batch query via market_data_client.
+        """
+        now = time.time()
+        if self.cached_wcrs and (now - self.wcrs_last_fetch < self.cache_ttl):
+            return self.cached_wcrs
+
+        symbols = [c["yahoo"] for c in CURRENCY_MAPPING]
+        quotes = await market_data_client.get_quotes(symbols)
+        quote_map = {q.get("symbol", "").upper(): q for q in quotes}
+        for q in quotes:
+            up_sym = q.get("upstreamSymbol")
+            if up_sym:
+                quote_map[up_sym.upper()] = q
+
+        results = []
+        for c in CURRENCY_MAPPING:
+            code = c["code"]
+            q = quote_map.get(c["yahoo"].upper())
+            if q and q.get("regularMarketPrice") is not None:
+                spot = round(float(q["regularMarketPrice"]), 4)
+                prev_close = q.get("regularMarketPreviousClose") or spot
+                prev_close = float(prev_close)
+                chg = round(float(q.get("regularMarketChange", spot - prev_close)), 4)
+                chg_pct = round(float(q.get("regularMarketChangePercent", (chg / prev_close) * 100 if prev_close else 0.0)), 2)
+                range_low = q.get("fiftyTwoWeekLow", "N/A")
+                range_high = q.get("fiftyTwoWeekHigh", "N/A")
+                range_52w = f"{range_low} - {range_high}" if range_low != "N/A" and range_high != "N/A" else "N/A"
+            else:
+                spot = c["default_spot"]
+                chg = 0.0
+                chg_pct = 0.0
+                range_52w = "N/A"
+
+            if chg_pct >= 0.4:
+                bias = "STRONG BID / RALLY"
+            elif chg_pct >= 0.15:
+                bias = "OUTPERFORMING"
+            elif chg_pct > -0.15:
+                bias = "STABLE / RANGEBOUND"
+            elif chg_pct > -0.4:
+                bias = "UNDERPERFORMING"
+            else:
+                bias = "SELLING PRESSURE"
+
+            results.append({
+                "code": code,
+                "name": c["name"],
+                "spot": spot,
+                "change": chg,
+                "change_pct": chg_pct,
+                "range_52w": range_52w,
+                "bias": bias
+            })
+
+        sorted_results = sorted(results, key=lambda x: x["change_pct"], reverse=True)
+        self.cached_wcrs = sorted_results
+        self.wcrs_last_fetch = now
+        return sorted_results
 
     async def get_fdm_async(self) -> List[Dict[str, Any]]:
-        return self.get_fdm()
+        """
+        Global Commodities & Energy Matrix (FDM) async batch query via market_data_client.
+        """
+        now = time.time()
+        if self.cached_fdm and (now - self.fdm_last_fetch < self.cache_ttl):
+            return self.cached_fdm
+
+        symbols = [com["yahoo"] for com in COMMODITY_MAPPING]
+        quotes = await market_data_client.get_quotes(symbols)
+        quote_map = {q.get("symbol", "").upper(): q for q in quotes}
+        for q in quotes:
+            up_sym = q.get("upstreamSymbol")
+            if up_sym:
+                quote_map[up_sym.upper()] = q
+
+        results = []
+        for com in COMMODITY_MAPPING:
+            q = quote_map.get(com["yahoo"].upper())
+            if q and q.get("regularMarketPrice") is not None:
+                price = round(float(q["regularMarketPrice"]), 2)
+                chg = round(float(q.get("regularMarketChange", 0.0)), 2)
+                chg_pct = round(float(q.get("regularMarketChangePercent", 0.0)), 2)
+            else:
+                price = com["default_price"]
+                chg = 0.0
+                chg_pct = 0.0
+
+            results.append({
+                "symbol": com["symbol"],
+                "name": com["name"],
+                "category": com["category"],
+                "price": price,
+                "change": chg,
+                "change_pct": chg_pct,
+                "unit": com["unit"]
+            })
+
+        self.cached_fdm = results
+        self.fdm_last_fetch = now
+        return results
 
