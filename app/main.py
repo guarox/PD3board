@@ -431,41 +431,39 @@ async def execute_command(req: CommandRequest):
         ob = get_or_create_orderbook(ticker)
         data = ob.get_snapshot() if ob else {}
     elif fn == "WEI":
-        data = {"indices": equities_feed.get_wei_matrix()}
+        data = {"indices": await equities_feed.get_wei_matrix_async()}
     elif fn == "TOP":
-        data = {"news": news_feed.get_latest_news()}
+        data = {"news": await news_feed.get_latest_news_async()}
     elif fn == "YCRV":
-        data = yield_curve_feed.get_curve()
+        data = await yield_curve_feed.get_curve_async()
     elif fn == "DES":
-        data = equities_feed.get_security_description(ticker)
+        data = await equities_feed.get_security_description_async(ticker)
     elif fn == "ANR":
-        data = equities_feed.get_analyst_recommendations(ticker)
+        data = await equities_feed.get_analyst_recommendations_async(ticker)
     elif fn == "FA":
-        data = equities_feed.get_financial_analysis(ticker)
+        data = await equities_feed.get_financial_analysis_async(ticker)
     elif fn == "RV":
-        data = equities_feed.get_relative_valuation(ticker)
+        data = await equities_feed.get_relative_valuation_async(ticker)
     elif fn == "EE":
-        data = equities_feed.get_earnings_estimates(ticker)
+        data = await equities_feed.get_earnings_estimates_async(ticker)
     elif fn == "WIRP":
-        data = world_macro_feed.get_wirp()
+        data = await world_macro_feed.get_wirp_async()
     elif fn == "WCRS":
-        data = {"currencies": world_macro_feed.get_wcrs()}
+        data = {"currencies": await world_macro_feed.get_wcrs_async()}
     elif fn == "FDM":
-        data = {"commodities": world_macro_feed.get_fdm()}
+        data = {"commodities": await world_macro_feed.get_fdm_async()}
     elif fn == "ECO":
-        data = {"events": eco_feed.get_events()}
+        data = {"events": await eco_feed.get_events_async()}
     elif fn == "OMON":
-        price = equities_feed.get_security_price(ticker)
-        data = options_feed.get_options_chain(ticker, price)
-    elif fn == "MAPS":
-        data = market_heatmap_feed.get_market_heatmap()
+        data = await options_feed.get_options_chain_async(ticker)
+    elif fn in {"MAPS", "HEAT"}:
+        data = await market_heatmap_feed.get_market_heatmap_async()
     elif fn == "INSD":
-        data = insider_holdings_feed.get_insider_transactions(ticker)
+        data = await insider_holdings_feed.get_insider_transactions_async(ticker)
     elif fn == "HDS":
-        data = insider_holdings_feed.get_institutional_holders(ticker)
-    elif fn == "AI":
-        price = equities_feed.get_security_price(ticker)
-        data = ai_research_feed.generate_research_memo(ticker, price)
+        data = await insider_holdings_feed.get_institutional_holders_async(ticker)
+    elif fn in {"AI", "RES"}:
+        data = await ai_research_feed.generate_research_memo_async(ticker)
     elif fn == "HELP":
         data = {
             "help": [
@@ -499,75 +497,71 @@ async def execute_command(req: CommandRequest):
 
 @app.get("/api/wei")
 async def get_wei():
-    return equities_feed.get_wei_matrix()
+    return await equities_feed.get_wei_matrix_async()
 
 @app.get("/api/yield_curve")
 async def get_yield_curve():
-    return yield_curve_feed.get_curve()
+    return await yield_curve_feed.get_curve_async()
 
 @app.get("/api/news")
 async def get_news():
-    return news_feed.get_latest_news()
+    return await news_feed.get_latest_news_async()
 
 @app.get("/api/eco")
 async def get_eco():
-    return eco_feed.get_events()
+    return await eco_feed.get_events_async()
 
 @app.get("/api/des/{symbol}")
 async def get_des(symbol: str):
-    return equities_feed.get_security_description(symbol)
+    return await equities_feed.get_security_description_async(symbol)
 
 @app.get("/api/anr/{symbol}")
 async def get_anr(symbol: str):
-    return equities_feed.get_analyst_recommendations(symbol)
+    return await equities_feed.get_analyst_recommendations_async(symbol)
 
 @app.get("/api/fa/{symbol}")
 async def get_fa(symbol: str):
-    return equities_feed.get_financial_analysis(symbol)
+    return await equities_feed.get_financial_analysis_async(symbol)
 
 @app.get("/api/rv/{symbol}")
 async def get_rv(symbol: str):
-    return equities_feed.get_relative_valuation(symbol)
+    return await equities_feed.get_relative_valuation_async(symbol)
 
 @app.get("/api/ee/{symbol}")
 async def get_ee(symbol: str):
-    return equities_feed.get_earnings_estimates(symbol)
+    return await equities_feed.get_earnings_estimates_async(symbol)
 
 @app.get("/api/wirp")
 async def get_wirp():
-    return world_macro_feed.get_wirp()
+    return await world_macro_feed.get_wirp_async()
 
 @app.get("/api/wcrs")
 async def get_wcrs():
-    return world_macro_feed.get_wcrs()
+    return await world_macro_feed.get_wcrs_async()
 
 @app.get("/api/fdm")
 async def get_fdm():
-    return world_macro_feed.get_fdm()
+    return await world_macro_feed.get_fdm_async()
 
 @app.get("/api/options/{symbol}")
 async def get_options(symbol: str):
-    sym = symbol.upper()
-    price = equities_feed.get_security_price(sym)
-    return options_feed.get_options_chain(sym, price)
+    return await options_feed.get_options_chain_async(symbol)
 
 @app.get("/api/heatmap")
 async def get_heatmap():
-    return market_heatmap_feed.get_market_heatmap()
+    return await market_heatmap_feed.get_market_heatmap_async()
 
 @app.get("/api/insiders/{symbol}")
 async def get_insiders(symbol: str):
-    return insider_holdings_feed.get_insider_transactions(symbol)
+    return await insider_holdings_feed.get_insider_transactions_async(symbol)
 
 @app.get("/api/holders/{symbol}")
 async def get_holders(symbol: str):
-    return insider_holdings_feed.get_institutional_holders(symbol)
+    return await insider_holdings_feed.get_institutional_holders_async(symbol)
 
 @app.get("/api/research/{symbol}")
 async def get_research(symbol: str):
-    sym = symbol.upper()
-    price = equities_feed.get_security_price(sym)
-    return ai_research_feed.generate_research_memo(sym, price)
+    return await ai_research_feed.generate_research_memo_async(symbol)
 
 @app.get("/api/help")
 async def get_help():

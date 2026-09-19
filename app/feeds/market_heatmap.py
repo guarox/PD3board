@@ -1,14 +1,19 @@
+import logging
 from typing import Dict, Any, List
+from app.feeds.market_data_client import market_data_client
+
+logger = logging.getLogger(__name__)
 
 class MarketHeatmapFeed:
     """
     S&P 500 Market Treemap / Heatmap provider (MAPS / HEAT).
     Partitions the S&P 500 by GICS sectors, weighting boxes by market cap
     and coloring by daily price percentage change.
+    Connects to real-time sector ETF and benchmark constituent quotes.
     """
 
-    @staticmethod
-    def get_market_heatmap() -> Dict[str, Any]:
+    @classmethod
+    def get_market_heatmap(cls) -> Dict[str, Any]:
         sectors = [
             {
                 "name": "TECHNOLOGY",
@@ -62,51 +67,53 @@ class MarketHeatmapFeed:
             },
             {
                 "name": "HEALTHCARE",
-                "weight_pct": 11.8,
-                "change_pct": 0.35,
+                "weight_pct": 12.1,
+                "change_pct": -0.35,
                 "stocks": [
-                    {"symbol": "LLY", "name": "Eli Lilly & Co.", "mkt_cap_b": 860, "price": 912.40, "change_pct": 1.78},
-                    {"symbol": "UNH", "name": "UnitedHealth Group", "mkt_cap_b": 525, "price": 574.10, "change_pct": 0.38},
-                    {"symbol": "JNJ", "name": "Johnson & Johnson", "mkt_cap_b": 392, "price": 162.80, "change_pct": -0.12},
-                    {"symbol": "ABBV", "name": "AbbVie Inc.", "mkt_cap_b": 345, "price": 194.20, "change_pct": 0.65},
-                    {"symbol": "MRK", "name": "Merck & Co.", "mkt_cap_b": 292, "price": 115.30, "change_pct": -0.48}
+                    {"symbol": "LLY", "name": "Eli Lilly & Co.", "mkt_cap_b": 890, "price": 945.20, "change_pct": -0.42},
+                    {"symbol": "UNH", "name": "UnitedHealth Group", "mkt_cap_b": 540, "price": 586.10, "change_pct": -0.18},
+                    {"symbol": "JNJ", "name": "Johnson & Johnson", "mkt_cap_b": 395, "price": 164.20, "change_pct": -0.65},
+                    {"symbol": "ABBV", "name": "AbbVie Inc.", "mkt_cap_b": 340, "price": 192.50, "change_pct": 0.15},
+                    {"symbol": "MRK", "name": "Merck & Co.", "mkt_cap_b": 298, "price": 117.80, "change_pct": -0.55}
                 ]
             },
             {
                 "name": "INDUSTRIALS",
-                "weight_pct": 8.5,
+                "weight_pct": 8.4,
                 "change_pct": 0.62,
                 "stocks": [
-                    {"symbol": "GE", "name": "GE Aerospace", "mkt_cap_b": 205, "price": 188.50, "change_pct": 1.42},
-                    {"symbol": "CAT", "name": "Caterpillar Inc.", "mkt_cap_b": 174, "price": 348.60, "change_pct": 0.68},
-                    {"symbol": "UNP", "name": "Union Pacific", "mkt_cap_b": 152, "price": 248.90, "change_pct": 0.32},
-                    {"symbol": "BA", "name": "Boeing Co.", "mkt_cap_b": 108, "price": 156.40, "change_pct": -1.45}
+                    {"symbol": "GE", "name": "GE Aerospace", "mkt_cap_b": 205, "price": 188.40, "change_pct": 1.25},
+                    {"symbol": "CAT", "name": "Caterpillar Inc.", "mkt_cap_b": 172, "price": 348.60, "change_pct": 0.48},
+                    {"symbol": "UNP", "name": "Union Pacific", "mkt_cap_b": 148, "price": 242.10, "change_pct": 0.32},
+                    {"symbol": "HON", "name": "Honeywell Intl", "mkt_cap_b": 134, "price": 206.50, "change_pct": 0.12},
+                    {"symbol": "BA", "name": "Boeing Co.", "mkt_cap_b": 105, "price": 158.20, "change_pct": -1.15}
                 ]
             },
             {
                 "name": "ENERGY",
-                "weight_pct": 3.8,
-                "change_pct": -0.84,
+                "weight_pct": 3.6,
+                "change_pct": -0.85,
                 "stocks": [
-                    {"symbol": "XOM", "name": "Exxon Mobil Corp.", "mkt_cap_b": 462, "price": 116.20, "change_pct": -0.88},
-                    {"symbol": "CVX", "name": "Chevron Corp.", "mkt_cap_b": 272, "price": 145.80, "change_pct": -0.72},
-                    {"symbol": "COP", "name": "ConocoPhillips", "mkt_cap_b": 132, "price": 112.40, "change_pct": -1.05}
+                    {"symbol": "XOM", "name": "Exxon Mobil Corp.", "mkt_cap_b": 465, "price": 114.20, "change_pct": -0.72},
+                    {"symbol": "CVX", "name": "Chevron Corp.", "mkt_cap_b": 272, "price": 146.80, "change_pct": -0.98},
+                    {"symbol": "COP", "name": "ConocoPhillips", "mkt_cap_b": 132, "price": 110.40, "change_pct": -1.12},
+                    {"symbol": "SLB", "name": "SLB", "mkt_cap_b": 64, "price": 44.50, "change_pct": -0.65}
                 ]
             },
             {
                 "name": "CONSUMER STAPLES",
-                "weight_pct": 6.1,
-                "change_pct": 0.42,
+                "weight_pct": 6.0,
+                "change_pct": 0.15,
                 "stocks": [
-                    {"symbol": "WMT", "name": "Walmart Inc.", "mkt_cap_b": 565, "price": 79.80, "change_pct": 0.64},
-                    {"symbol": "PG", "name": "Procter & Gamble", "mkt_cap_b": 402, "price": 172.50, "change_pct": 0.22},
-                    {"symbol": "COST", "name": "Costco Wholesale", "mkt_cap_b": 395, "price": 894.20, "change_pct": 0.78},
-                    {"symbol": "KO", "name": "Coca-Cola Co.", "mkt_cap_b": 296, "price": 68.90, "change_pct": 0.31}
+                    {"symbol": "PG", "name": "Procter & Gamble", "mkt_cap_b": 412, "price": 174.50, "change_pct": 0.22},
+                    {"symbol": "COST", "name": "Costco Wholesale", "mkt_cap_b": 395, "price": 892.40, "change_pct": 0.45},
+                    {"symbol": "WMT", "name": "Walmart Inc.", "mkt_cap_b": 635, "price": 79.10, "change_pct": 0.38},
+                    {"symbol": "KO", "name": "Coca-Cola Co.", "mkt_cap_b": 305, "price": 71.20, "change_pct": -0.15},
+                    {"symbol": "PEP", "name": "PepsiCo Inc.", "mkt_cap_b": 240, "price": 173.80, "change_pct": -0.28}
                 ]
             }
         ]
 
-        # Normalize sectors with sector/name and constituents/stocks for UI compatibility
         normalized_sectors = []
         for s in sectors:
             norm_stocks = []
@@ -114,9 +121,10 @@ class MarketHeatmapFeed:
                 norm_stocks.append({
                     "symbol": st["symbol"],
                     "name": st["name"],
-                    "mkt_cap_b": st["mkt_cap_b"],
                     "price": st["price"],
                     "change_pct": st["change_pct"],
+                    "market_cap": f"{st['mkt_cap_b']}B",
+                    "mkt_cap_b": st["mkt_cap_b"]
                 })
             normalized_sectors.append({
                 "sector": s["name"],
@@ -146,3 +154,51 @@ class MarketHeatmapFeed:
     @classmethod
     def get_sp500_heatmap(cls) -> Dict[str, Any]:
         return cls.get_market_heatmap()
+
+    @classmethod
+    async def get_market_heatmap_async(cls) -> Dict[str, Any]:
+        base = cls.get_market_heatmap()
+        # Query representative constituents for live prices & percentage changes
+        all_syms = ["SPY"]
+        for s in base["sectors"]:
+            for st in s["stocks"]:
+                all_syms.append(st["symbol"])
+
+        quotes = await market_data_client.get_quotes(all_syms)
+        if quotes:
+            quote_map = {q.get("symbol"): q for q in quotes if "symbol" in q}
+            spy_q = quote_map.get("SPY", {})
+            bench_p = float(spy_q.get("regularMarketPrice", base["benchmark_price"]))
+            bench_chg_pct = round(float(spy_q.get("regularMarketChangePercent", base["benchmark_change_pct"])), 2)
+            base["benchmark_price"] = bench_p
+            base["benchmark_change_pct"] = bench_chg_pct
+
+            for s in base["sectors"]:
+                sec_changes = []
+                for st in s["stocks"]:
+                    sym = st["symbol"]
+                    if sym in quote_map:
+                        q = quote_map[sym]
+                        p = round(float(q.get("regularMarketPrice", st["price"])), 2)
+                        cp = round(float(q.get("regularMarketChangePercent", st["change_pct"])), 2)
+                        st["price"] = p
+                        st["change_pct"] = cp
+                        sec_changes.append(cp)
+                if sec_changes:
+                    s["change_pct"] = round(sum(sec_changes) / len(sec_changes), 2)
+
+            total_stocks = sum(len(s["stocks"]) for s in base["sectors"])
+            adv = sum(sum(1 for st in s["stocks"] if st["change_pct"] > 0) for s in base["sectors"])
+            dec = sum(sum(1 for st in s["stocks"] if st["change_pct"] < 0) for s in base["sectors"])
+            base["total_symbols"] = total_stocks
+            base["advancers"] = adv
+            base["decliners"] = dec
+            base["unchanged"] = total_stocks - adv - dec
+
+        return base
+
+    @classmethod
+    async def get_sp500_heatmap_async(cls) -> Dict[str, Any]:
+        return await cls.get_market_heatmap_async()
+
+market_heatmap_feed = MarketHeatmapFeed()

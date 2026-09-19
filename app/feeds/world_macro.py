@@ -224,3 +224,13 @@ class WorldMacroFeed:
         self.cached_fdm = results
         self.fdm_last_fetch = now
         return results
+
+    async def get_wirp_async(self) -> Dict[str, Any]:
+        return self.get_wirp()
+
+    async def get_wcrs_async(self) -> List[Dict[str, Any]]:
+        return self.get_wcrs()
+
+    async def get_fdm_async(self) -> List[Dict[str, Any]]:
+        return self.get_fdm()
+

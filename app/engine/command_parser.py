@@ -19,6 +19,7 @@ class CommandParser:
     Parses Bloomberg-style terminal commands:
     Pattern: <TICKER> [SECTOR] [FUNCTION] <GO>
     Or standalone functions: <FUNCTION> <GO>
+    Or prefix functions: <FUNCTION> <TICKER> <GO>
     """
 
     @staticmethod
@@ -43,6 +44,32 @@ class CommandParser:
                 "valid": True,
                 "ticker": None,
                 "sector": None,
+                "function": fn,
+                "raw": raw_command
+            }
+
+        # Check for prefix function syntax (e.g. "FA AAPL", "DES ETHUSDT", "OMON NVDA")
+        if len(tokens) >= 2 and tokens[0] in FUNCTIONS and tokens[1] not in FUNCTIONS and tokens[1] not in SECTORS:
+            fn = FUNCTION_ALIASES.get(tokens[0], tokens[0])
+            ticker = tokens[1]
+            sector = None
+            if len(tokens) >= 3 and tokens[2] in SECTORS:
+                sector = tokens[2]
+
+            if not sector:
+                if ticker in {"SPX", "NDX", "DJI", "VIX", "RUT"}:
+                    sector = "INDEX"
+                elif any(c in ticker for c in ["USDT", "BTC", "ETH", "SOL", "USD"]):
+                    sector = "CRNCY"
+                elif ticker.startswith("US") and ticker.endswith("Y"):
+                    sector = "GOVT"
+                else:
+                    sector = "EQUITY"
+
+            return {
+                "valid": True,
+                "ticker": ticker,
+                "sector": sector,
                 "function": fn,
                 "raw": raw_command
             }

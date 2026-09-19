@@ -1,10 +1,15 @@
+import logging
 import time
 from typing import Dict, Any, List
+from app.feeds.market_data_client import market_data_client
+
+logger = logging.getLogger(__name__)
 
 class EcoFeed:
     """
     Economic Calendar Feed (ECO) for PD3board.
     Tracks macro indicators, consensus estimates, actual releases, and market impact.
+    Connects to real-time economic calendar event stream.
     """
     def __init__(self):
         self.events: List[Dict[str, Any]] = [
@@ -92,3 +97,11 @@ class EcoFeed:
 
     def get_events(self) -> List[Dict[str, Any]]:
         return self.events
+
+    async def get_events_async(self) -> List[Dict[str, Any]]:
+        live_events = await market_data_client.get_economic_calendar()
+        if live_events and len(live_events) >= 5:
+            self.events = live_events
+        return self.events
+
+eco_feed = EcoFeed()
