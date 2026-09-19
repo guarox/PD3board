@@ -264,3 +264,10 @@ class NewsFeed:
     def get_latest_news(self, limit: int = 15) -> List[Dict[str, Any]]:
         """Return the latest headlines sorted by recency."""
         return self.headlines[:limit]
+
+    async def get_latest_news_async(self, limit: int = 15) -> List[Dict[str, Any]]:
+        """Return the latest live news headlines, refreshing if empty or older than 60s."""
+        if not self.headlines or (time.time() - self.last_refresh > 60):
+            await self.refresh_news()
+        return self.headlines[:limit] if self.headlines else self.get_latest_news(limit)
+

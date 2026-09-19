@@ -183,3 +183,7 @@ class YieldCurveFeed:
             "spread_2_10_bps": spread_2_10,
             "inverted": spread_2_10 < 0
         }
+
+    async def get_curve_async(self) -> Dict[str, Any]:
+        return await self.refresh_curve()
+
