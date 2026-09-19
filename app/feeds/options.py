@@ -24,6 +24,15 @@ class OptionsFeed:
         "META": 512.0,
         "TSLA": 235.0,
         "MCD": 295.0,
+        "BTC": 81500.0,
+        "BTCUSD": 81500.0,
+        "BTCUSDT": 81500.0,
+        "ETH": 2640.0,
+        "ETHUSD": 2640.0,
+        "ETHUSDT": 2640.0,
+        "SOL": 185.0,
+        "SOLUSD": 185.0,
+        "SOLUSDT": 185.0,
     }
 
     @classmethod
@@ -274,6 +283,12 @@ class OptionsFeed:
                     "max_pain_strike": max_pain,
                     "chain": chain
                 }
+
+        # Dynamic live price resolution for fallback chains
+        if spot_price is None or spot_price <= 0:
+            quotes = await market_data_client.get_quotes([symbol])
+            if quotes and quotes[0].get("regularMarketPrice") is not None:
+                spot_price = float(quotes[0]["regularMarketPrice"])
 
         return cls.get_options_chain(symbol, spot_price)
 

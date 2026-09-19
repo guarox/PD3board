@@ -8,6 +8,96 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+GLOBAL_SYMBOL_MAP: Dict[str, str] = {
+    # Equity Indices
+    "SPX": "^GSPC",
+    "^GSPC": "^GSPC",
+    "S&P500": "^GSPC",
+    "NDX": "^IXIC",
+    "^IXIC": "^IXIC",
+    "NASDAQ": "^IXIC",
+    "DJI": "^DJI",
+    "^DJI": "^DJI",
+    "DOW": "^DJI",
+    "RUT": "^RUT",
+    "^RUT": "^RUT",
+    "VIX": "^VIX",
+    "^VIX": "^VIX",
+    "FTSE": "^FTSE",
+    "^FTSE": "^FTSE",
+    "N225": "^N225",
+    "^N225": "^N225",
+    "DAX": "^GDAXI",
+    "^GDAXI": "^GDAXI",
+    # Crypto Assets
+    "BTC": "BTC-USD",
+    "BTCUSD": "BTC-USD",
+    "BTCUSDT": "BTC-USD",
+    "ETH": "ETH-USD",
+    "ETHUSD": "ETH-USD",
+    "ETHUSDT": "ETH-USD",
+    "SOL": "SOL-USD",
+    "SOLUSD": "SOL-USD",
+    "SOLUSDT": "SOL-USD",
+    "DOGE": "DOGE-USD",
+    "DOGEUSD": "DOGE-USD",
+    "DOGEUSDT": "DOGE-USD",
+    "XRP": "XRP-USD",
+    "XRPUSD": "XRP-USD",
+    "XRPUSDT": "XRP-USD",
+    "ADA": "ADA-USD",
+    "ADAUSD": "ADA-USD",
+    "ADAUSDT": "ADA-USD",
+    "BNB": "BNB-USD",
+    "BNBUSD": "BNB-USD",
+    "BNBUSDT": "BNB-USD",
+    "AVAX": "AVAX-USD",
+    "AVAXUSD": "AVAX-USD",
+    "AVAXUSDT": "AVAX-USD",
+    # Currencies & FX
+    "EURUSD": "EURUSD=X",
+    "EUR": "EURUSD=X",
+    "GBPUSD": "GBPUSD=X",
+    "GBP": "GBPUSD=X",
+    "USDJPY": "JPY=X",
+    "JPY": "JPY=X",
+    "AUDUSD": "AUDUSD=X",
+    "AUD": "AUDUSD=X",
+    "USDCAD": "CAD=X",
+    "CAD": "CAD=X",
+    "USDCHF": "CHF=X",
+    "CHF": "CHF=X",
+    "NZDUSD": "NZDUSD=X",
+    "NZD": "NZDUSD=X",
+    "USDCNH": "CNH=X",
+    "CNH": "CNH=X",
+    "USDMXN": "MXN=X",
+    "MXN": "MXN=X",
+    # Commodities & Energy
+    "CL1": "CL=F",
+    "CRUDE": "CL=F",
+    "CO1": "BZ=F",
+    "BRENT": "BZ=F",
+    "NG1": "NG=F",
+    "NATGAS": "NG=F",
+    "GC1": "GC=F",
+    "GOLD": "GC=F",
+    "SI1": "SI=F",
+    "SILVER": "SI=F",
+    "HG1": "HG=F",
+    "COPPER": "HG=F",
+    "W1": "ZW=F",
+    "WHEAT": "ZW=F",
+    "C1": "ZC=F",
+    "CORN": "ZC=F",
+    # Treasury Rates
+    "US10Y": "^TNX",
+    "US30Y": "^TYX",
+    "US5Y": "^FVX",
+    "US3M": "^IRX",
+    "IRX": "^IRX",
+}
+
 class MarketDataClient:
     """
     Unified asynchronous client for real financial market data:
@@ -85,7 +175,18 @@ class MarketDataClient:
         return None
 
     async def get_quotes(self, symbols: List[str]) -> List[Dict[str, Any]]:
-        sym_str = ",".join(s.upper() for s in symbols)
+        # Map input symbols to upstream provider symbols
+        mapped_to_orig: Dict[str, List[str]] = {}
+        upstream_symbols: List[str] = []
+        for s in symbols:
+            s_clean = s.strip().upper()
+            mapped = GLOBAL_SYMBOL_MAP.get(s_clean, s_clean)
+            upstream_symbols.append(mapped)
+            if mapped not in mapped_to_orig:
+                mapped_to_orig[mapped] = []
+            mapped_to_orig[mapped].append(s_clean)
+
+        sym_str = ",".join(sorted(set(upstream_symbols)))
         cache_key = f"quotes:{sym_str}"
         cached = self._get_from_cache(cache_key)
         if cached is not None:
@@ -102,8 +203,19 @@ class MarketDataClient:
                 if r.status == 200:
                     data = await r.json()
                     results = data.get("quoteResponse", {}).get("result", [])
-                    self._set_cache(cache_key, results, ttl_seconds=15)
-                    return results
+                    # Expand results to ensure original requested symbols are discoverable
+                    expanded_results = list(results)
+                    for item in results:
+                        item_sym = item.get("symbol")
+                        if item_sym in mapped_to_orig:
+                            for orig in mapped_to_orig[item_sym]:
+                                if orig != item_sym:
+                                    clone = dict(item)
+                                    clone["symbol"] = orig
+                                    clone["upstreamSymbol"] = item_sym
+                                    expanded_results.append(clone)
+                    self._set_cache(cache_key, expanded_results, ttl_seconds=15)
+                    return expanded_results
         except Exception as e:
             logger.warning("Error fetching quotes for %s: %s", sym_str, e)
         return []
@@ -112,13 +224,15 @@ class MarketDataClient:
         """
         Fetch fundamental summary modules from Yahoo Finance quoteSummary endpoint.
         """
+        sym = GLOBAL_SYMBOL_MAP.get(symbol.strip().upper(), symbol.strip().upper())
         if modules is None:
             modules = [
                 "price", "summaryDetail", "assetProfile", "financialData",
                 "defaultKeyStatistics", "incomeStatementHistory",
-                "balanceSheetHistory", "cashflowStatementHistory", "earningsTrend"
+                "balanceSheetHistory", "cashflowStatementHistory", "earningsTrend",
+                "recommendationTrend", "upgradeDowngradeHistory", "earningsHistory"
             ]
-        cache_key = f"summary:{symbol}:{','.join(modules)}"
+        cache_key = f"summary:{sym}:{','.join(modules)}"
 
         cached = self._get_from_cache(cache_key)
         if cached is not None:
@@ -126,9 +240,7 @@ class MarketDataClient:
 
         crumb = await self.get_yahoo_crumb()
         session = await self.get_session()
-        sym = symbol.upper()
         mod_str = ",".join(modules)
-        session = await self.get_session()
         url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{sym}?modules={mod_str}"
         if crumb:
             url += f"&crumb={crumb}"
