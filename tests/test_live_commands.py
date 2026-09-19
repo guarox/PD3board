@@ -158,6 +158,26 @@ async def test_command_ai():
     assert len(memo["competitive_moat"]) >= 1
 
 @pytest.mark.asyncio
+async def test_command_rv():
+    res = await execute_command(CommandRequest(command="MCD RV <GO>"))
+    assert res["success"] is True
+    rv = res["data"]
+    assert rv["symbol"] == "MCD"
+    assert len(rv["peers"]) >= 3
+    # Verify peer metrics are distinct and not all identical
+    op_margins = [p["op_margin"] for p in rv["peers"] if p.get("op_margin") != "N/A"]
+    assert len(set(op_margins)) > 1, f"Operating margins should be distinct, got {op_margins}"
+    ev_ebitdas = [p["ev_ebitda"] for p in rv["peers"] if p.get("ev_ebitda") != "N/A"]
+    assert len(set(ev_ebitdas)) > 1, f"EV/EBITDA values should be distinct, got {ev_ebitdas}"
+
+    # Verify crypto RV
+    res_crypto = await execute_command(CommandRequest(command="ETHUSDT RV <GO>"))
+    assert res_crypto["success"] is True
+    assert len(res_crypto["data"]["peers"]) >= 3
+    assert res_crypto["data"]["peers"][0]["price"] > 0
+
+
+@pytest.mark.asyncio
 async def test_prefix_syntax_support():
     # Verify prefix syntax: "FA AAPL"
     res = await execute_command(CommandRequest(command="FA AAPL"))
