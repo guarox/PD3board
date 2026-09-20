@@ -278,7 +278,201 @@ PEER_BASELINES: Dict[str, Dict[str, Any]] = {
     "F": {"name": "Ford Motor Co", "price": 10.80, "pe": 11.5, "fwd_pe": 7.2, "ev_ebitda": 8.5, "ps": 0.3, "op_margin": "4.1%", "roe": "9.8%", "div_yield": "5.60%"},
     "GM": {"name": "General Motors Co", "price": 48.50, "pe": 5.4, "fwd_pe": 4.9, "ev_ebitda": 6.8, "ps": 0.4, "op_margin": "6.5%", "roe": "14.2%", "div_yield": "1.05%"},
     "RIVN": {"name": "Rivian Automotive", "price": 13.20, "pe": "N/A", "fwd_pe": "N/A", "ev_ebitda": "N/A", "ps": 2.1, "op_margin": "-78.4%", "roe": "-45.2%", "div_yield": "0.00%"},
-    "TM": {"name": "Toyota Motor Corp", "price": 178.60, "pe": 8.2, "fwd_pe": 8.0, "ev_ebitda": 9.1, "ps": 0.8, "op_margin": "11.4%", "roe": "13.6%", "div_yield": "3.20%"}
+    "TM": {"name": "Toyota Motor Corp", "price": 178.60, "pe": 8.2, "fwd_pe": 8.0, "ev_ebitda": 9.1, "ps": 0.8, "op_margin": "11.4%", "roe": "13.6%", "div_yield": "3.20%"},
+    # Canadian Diversified Banks
+    "BMO": {"name": "Bank of Montreal", "price": 174.49, "pe": 19.9, "fwd_pe": 14.8, "ev_ebitda": "N/A", "ps": 3.4, "op_margin": "30.5%", "roe": "10.6%", "div_yield": "2.84%"},
+    "BNS": {"name": "Bank of Nova Scotia", "price": 94.07, "pe": 17.2, "fwd_pe": 13.9, "ev_ebitda": "N/A", "ps": 2.9, "op_margin": "41.2%", "roe": "11.5%", "div_yield": "3.50%"},
+    "RY": {"name": "Royal Bank of Canada", "price": 203.30, "pe": 17.9, "fwd_pe": 15.9, "ev_ebitda": "N/A", "ps": 4.1, "op_margin": "38.0%", "roe": "16.2%", "div_yield": "2.50%"},
+    "TD": {"name": "Toronto-Dominion Bank", "price": 122.33, "pe": 18.3, "fwd_pe": 15.3, "ev_ebitda": "N/A", "ps": 3.2, "op_margin": "40.0%", "roe": "12.8%", "div_yield": "2.65%"},
+    "CM": {"name": "Canadian Imperial Bank", "price": 114.87, "pe": 15.4, "fwd_pe": 14.1, "ev_ebitda": "N/A", "ps": 2.8, "op_margin": "46.4%", "roe": "15.6%", "div_yield": "2.69%"},
+    # Communications & Public Safety Equipment
+    "MSI": {"name": "Motorola Solutions Inc", "price": 455.20, "pe": 34.2, "fwd_pe": 26.5, "ev_ebitda": 22.8, "ps": 7.4, "op_margin": "27.5%", "roe": "125.0%", "div_yield": "0.98%"},
+    "CSCO": {"name": "Cisco Systems Inc", "price": 54.20, "pe": 21.5, "fwd_pe": 15.2, "ev_ebitda": 13.8, "ps": 4.1, "op_margin": "26.8%", "roe": "28.5%", "div_yield": "2.95%"},
+    "ANET": {"name": "Arista Networks Inc", "price": 385.40, "pe": 44.8, "fwd_pe": 33.2, "ev_ebitda": 32.1, "ps": 18.5, "op_margin": "41.2%", "roe": "34.5%", "div_yield": "0.00%"},
+    "HPE": {"name": "Hewlett Packard Enterprise", "price": 18.40, "pe": 12.8, "fwd_pe": 9.4, "ev_ebitda": 7.2, "ps": 0.8, "op_margin": "9.8%", "roe": "14.2%", "div_yield": "2.82%"},
+    "ZBRA": {"name": "Zebra Technologies Corp", "price": 372.50, "pe": 38.4, "fwd_pe": 24.1, "ev_ebitda": 19.5, "ps": 4.2, "op_margin": "18.5%", "roe": "16.8%", "div_yield": "0.00%"},
+    # Aerospace & Defense
+    "BA": {"name": "Boeing Co", "price": 155.80, "pe": "N/A", "fwd_pe": 32.5, "ev_ebitda": 38.2, "ps": 1.2, "op_margin": "-4.8%", "roe": "N/A", "div_yield": "0.00%"},
+    "LMT": {"name": "Lockheed Martin Corp", "price": 565.40, "pe": 20.2, "fwd_pe": 18.4, "ev_ebitda": 14.5, "ps": 1.9, "op_margin": "12.8%", "roe": "72.4%", "div_yield": "2.26%"},
+    "RTX": {"name": "RTX Corp", "price": 121.50, "pe": 36.8, "fwd_pe": 20.1, "ev_ebitda": 16.2, "ps": 2.1, "op_margin": "10.5%", "roe": "11.2%", "div_yield": "2.07%"},
+    "NOC": {"name": "Northrop Grumman Corp", "price": 510.20, "pe": 28.5, "fwd_pe": 19.2, "ev_ebitda": 15.8, "ps": 1.8, "op_margin": "11.4%", "roe": "18.9%", "div_yield": "1.62%"},
+    "GD": {"name": "General Dynamics Corp", "price": 298.60, "pe": 22.4, "fwd_pe": 18.8, "ev_ebitda": 14.9, "ps": 1.7, "op_margin": "10.2%", "roe": "19.5%", "div_yield": "1.90%"},
+    # Energy, Oil & Gas
+    "XOM": {"name": "Exxon Mobil Corp", "price": 116.40, "pe": 14.2, "fwd_pe": 13.1, "ev_ebitda": 8.1, "ps": 1.3, "op_margin": "14.2%", "roe": "18.5%", "div_yield": "3.26%"},
+    "CVX": {"name": "Chevron Corp", "price": 148.20, "pe": 14.8, "fwd_pe": 12.9, "ev_ebitda": 7.8, "ps": 1.4, "op_margin": "13.8%", "roe": "13.2%", "div_yield": "4.40%"},
+    "COP": {"name": "ConocoPhillips", "price": 108.50, "pe": 12.5, "fwd_pe": 11.8, "ev_ebitda": 6.5, "ps": 2.2, "op_margin": "23.4%", "roe": "20.1%", "div_yield": "3.10%"},
+    "SLB": {"name": "SLB", "price": 43.80, "pe": 14.1, "fwd_pe": 11.2, "ev_ebitda": 8.4, "ps": 1.8, "op_margin": "16.5%", "roe": "21.4%", "div_yield": "2.51%"},
+    "EOG": {"name": "EOG Resources Inc", "price": 126.40, "pe": 10.2, "fwd_pe": 10.0, "ev_ebitda": 5.2, "ps": 3.1, "op_margin": "35.2%", "roe": "24.8%", "div_yield": "2.88%"},
+    # Healthcare & Pharmaceuticals
+    "LLY": {"name": "Eli Lilly & Co", "price": 948.50, "pe": 112.4, "fwd_pe": 41.2, "ev_ebitda": 64.2, "ps": 22.1, "op_margin": "32.4%", "roe": "62.5%", "div_yield": "0.55%"},
+    "JNJ": {"name": "Johnson & Johnson", "price": 162.20, "pe": 24.1, "fwd_pe": 15.8, "ev_ebitda": 13.9, "ps": 4.5, "op_margin": "28.1%", "roe": "31.2%", "div_yield": "3.06%"},
+    "ABBV": {"name": "AbbVie Inc", "price": 192.40, "pe": 48.5, "fwd_pe": 16.5, "ev_ebitda": 15.2, "ps": 6.1, "op_margin": "34.2%", "roe": "58.4%", "div_yield": "3.22%"},
+    "MRK": {"name": "Merck & Co Inc", "price": 115.80, "pe": 22.8, "fwd_pe": 12.8, "ev_ebitda": 12.4, "ps": 4.6, "op_margin": "29.5%", "roe": "32.1%", "div_yield": "2.66%"},
+    "PFE": {"name": "Pfizer Inc", "price": 28.90, "pe": 34.2, "fwd_pe": 10.4, "ev_ebitda": 10.1, "ps": 2.8, "op_margin": "18.2%", "roe": "8.5%", "div_yield": "5.81%"},
+    # Consumer Retail
+    "WMT": {"name": "Walmart Inc", "price": 80.20, "pe": 38.5, "fwd_pe": 28.4, "ev_ebitda": 16.8, "ps": 1.0, "op_margin": "4.4%", "roe": "20.1%", "div_yield": "1.04%"},
+    "COST": {"name": "Costco Wholesale Corp", "price": 912.40, "pe": 54.2, "fwd_pe": 48.1, "ev_ebitda": 29.5, "ps": 1.6, "op_margin": "3.8%", "roe": "29.4%", "div_yield": "0.51%"},
+    "TGT": {"name": "Target Corp", "price": 152.40, "pe": 16.2, "fwd_pe": 15.4, "ev_ebitda": 9.8, "ps": 0.7, "op_margin": "5.6%", "roe": "31.5%", "div_yield": "2.94%"},
+    "HD": {"name": "Home Depot Inc", "price": 405.20, "pe": 26.8, "fwd_pe": 24.9, "ev_ebitda": 17.5, "ps": 2.6, "op_margin": "14.8%", "roe": "108.4%", "div_yield": "2.22%"},
+    "LOW": {"name": "Lowe's Companies Inc", "price": 262.40, "pe": 21.4, "fwd_pe": 19.8, "ev_ebitda": 14.2, "ps": 1.8, "op_margin": "12.6%", "roe": "N/A", "div_yield": "1.75%"},
+    # Industrial Machinery
+    "CAT": {"name": "Caterpillar Inc", "price": 385.20, "pe": 18.2, "fwd_pe": 16.8, "ev_ebitda": 13.5, "ps": 2.8, "op_margin": "21.4%", "roe": "55.8%", "div_yield": "1.46%"},
+    "DE": {"name": "Deere & Co", "price": 408.50, "pe": 15.4, "fwd_pe": 16.2, "ev_ebitda": 12.1, "ps": 2.2, "op_margin": "20.5%", "roe": "34.2%", "div_yield": "1.44%"},
+    "GE": {"name": "GE Aerospace", "price": 188.40, "pe": 34.2, "fwd_pe": 32.5, "ev_ebitda": 24.1, "ps": 2.9, "op_margin": "16.8%", "roe": "22.5%", "div_yield": "0.60%"},
+    "HON": {"name": "Honeywell Intl Inc", "price": 208.50, "pe": 24.5, "fwd_pe": 19.8, "ev_ebitda": 15.4, "ps": 3.6, "op_margin": "19.5%", "roe": "34.5%", "div_yield": "2.17%"},
+    "MMM": {"name": "3M Co", "price": 135.20, "pe": 18.9, "fwd_pe": 16.5, "ev_ebitda": 12.8, "ps": 3.1, "op_margin": "18.2%", "roe": "28.5%", "div_yield": "2.07%"},
+    # Enterprise Software & Cloud
+    "CRM": {"name": "Salesforce Inc", "price": 298.50, "pe": 48.2, "fwd_pe": 28.5, "ev_ebitda": 24.5, "ps": 8.1, "op_margin": "19.5%", "roe": "10.4%", "div_yield": "0.54%"},
+    "NOW": {"name": "ServiceNow Inc", "price": 890.20, "pe": 78.4, "fwd_pe": 52.1, "ev_ebitda": 46.2, "ps": 18.2, "op_margin": "14.8%", "roe": "17.5%", "div_yield": "0.00%"},
+    "ORCL": {"name": "Oracle Corp", "price": 172.40, "pe": 42.1, "fwd_pe": 28.4, "ev_ebitda": 20.8, "ps": 8.9, "op_margin": "30.4%", "roe": "64.2%", "div_yield": "0.93%"},
+    "ADBE": {"name": "Adobe Inc", "price": 515.20, "pe": 41.5, "fwd_pe": 25.8, "ev_ebitda": 26.4, "ps": 11.8, "op_margin": "35.8%", "roe": "35.2%", "div_yield": "0.00%"},
+    "SNOW": {"name": "Snowflake Inc", "price": 118.50, "pe": "N/A", "fwd_pe": 95.0, "ev_ebitda": "N/A", "ps": 11.2, "op_margin": "-32.4%", "roe": "-17.5%", "div_yield": "0.00%"},
+    # Cybersecurity
+    "PANW": {"name": "Palo Alto Networks", "price": 365.40, "pe": 48.5, "fwd_pe": 54.2, "ev_ebitda": 42.1, "ps": 15.2, "op_margin": "11.8%", "roe": "34.2%", "div_yield": "0.00%"},
+    "CRWD": {"name": "CrowdStrike Holdings", "price": 298.50, "pe": "N/A", "fwd_pe": 72.5, "ev_ebitda": 68.4, "ps": 20.5, "op_margin": "2.4%", "roe": "7.8%", "div_yield": "0.00%"},
+    "FTNT": {"name": "Fortinet Inc", "price": 78.20, "pe": 44.2, "fwd_pe": 34.1, "ev_ebitda": 28.4, "ps": 11.2, "op_margin": "28.5%", "roe": "84.2%", "div_yield": "0.00%"},
+    "ZS": {"name": "Zscaler Inc", "price": 174.50, "pe": "N/A", "fwd_pe": 56.4, "ev_ebitda": 54.2, "ps": 12.8, "op_margin": "-4.2%", "roe": "-6.8%", "div_yield": "0.00%"},
+    "NET": {"name": "Cloudflare Inc", "price": 82.40, "pe": "N/A", "fwd_pe": 98.2, "ev_ebitda": "N/A", "ps": 18.5, "op_margin": "-6.8%", "roe": "-11.2%", "div_yield": "0.00%"},
+    # Financial Services & Payments
+    "V": {"name": "Visa Inc", "price": 284.50, "pe": 30.5, "fwd_pe": 25.2, "ev_ebitda": 22.8, "ps": 16.4, "op_margin": "66.8%", "roe": "51.2%", "div_yield": "0.73%"},
+    "MA": {"name": "Mastercard Inc", "price": 492.10, "pe": 37.2, "fwd_pe": 29.8, "ev_ebitda": 27.5, "ps": 17.8, "op_margin": "57.4%", "roe": "178.5%", "div_yield": "0.54%"},
+    "PYPL": {"name": "PayPal Holdings", "price": 72.40, "pe": 18.5, "fwd_pe": 14.8, "ev_ebitda": 11.4, "ps": 2.5, "op_margin": "17.2%", "roe": "21.4%", "div_yield": "0.00%"},
+    "SQ": {"name": "Block Inc", "price": 68.50, "pe": 45.2, "fwd_pe": 18.2, "ev_ebitda": 16.8, "ps": 1.9, "op_margin": "4.8%", "roe": "6.2%", "div_yield": "0.00%"},
+    "COIN": {"name": "Coinbase Global", "price": 178.50, "pe": 34.8, "fwd_pe": 28.5, "ev_ebitda": 22.1, "ps": 9.4, "op_margin": "28.5%", "roe": "18.2%", "div_yield": "0.00%"},
+    # Telecom & Media
+    "T": {"name": "AT&T Inc", "price": 21.80, "pe": 11.2, "fwd_pe": 9.5, "ev_ebitda": 6.8, "ps": 1.3, "op_margin": "19.5%", "roe": "11.2%", "div_yield": "5.09%"},
+    "VZ": {"name": "Verizon Communications", "price": 44.50, "pe": 10.8, "fwd_pe": 9.4, "ev_ebitda": 6.9, "ps": 1.4, "op_margin": "22.8%", "roe": "12.8%", "div_yield": "6.08%"},
+    "TMUS": {"name": "T-Mobile US Inc", "price": 204.50, "pe": 24.2, "fwd_pe": 19.8, "ev_ebitda": 9.8, "ps": 3.0, "op_margin": "18.4%", "roe": "14.8%", "div_yield": "1.27%"},
+    "CMCSA": {"name": "Comcast Corp", "price": 41.20, "pe": 10.5, "fwd_pe": 9.8, "ev_ebitda": 6.5, "ps": 1.3, "op_margin": "18.9%", "roe": "17.5%", "div_yield": "3.01%"},
+    "DIS": {"name": "Walt Disney Co", "price": 95.80, "pe": 38.2, "fwd_pe": 18.5, "ev_ebitda": 13.8, "ps": 1.9, "op_margin": "10.4%", "roe": "4.8%", "div_yield": "0.94%"}
+}
+
+GICS_PEER_CLUSTERS: Dict[str, Dict[str, Any]] = {
+    "CANADIAN_BANKS": {
+        "industry": "Banks - Canadian Diversified",
+        "tickers": {"BMO", "RY", "TD", "BNS", "CM", "NA"},
+        "peers": ["BMO", "RY", "TD", "BNS", "CM"],
+    },
+    "DIVERSIFIED_BANKS": {
+        "industry": "Diversified Banking & Financial Services",
+        "tickers": {"JPM", "BAC", "WFC", "C", "GS", "MS", "USB", "PNC", "TFC", "BK", "STT", "HSBC", "SAN", "BBVA", "UBS", "DB"},
+        "peers": ["JPM", "BAC", "WFC", "GS", "MS"],
+    },
+    "REGIONAL_BANKS": {
+        "industry": "Regional & Commercial Banking",
+        "tickers": {"KRE", "FITB", "CFG", "KEY", "RF", "HBAN", "MTB", "ZION", "CMA", "WAL"},
+        "peers": ["FITB", "CFG", "KEY", "RF", "HBAN"],
+    },
+    "FINTECH_PAYMENTS": {
+        "industry": "Transaction Processing & Financial Technology",
+        "tickers": {"V", "MA", "PYPL", "SQ", "COIN", "AFRM", "FIS", "FISV", "GPN", "HOOD", "SOFI"},
+        "peers": ["V", "MA", "PYPL", "SQ", "COIN"],
+    },
+    "ASSET_MANAGEMENT": {
+        "industry": "Asset Management & Alternative Investments",
+        "tickers": {"BLK", "BX", "KKR", "APO", "ARES", "BEN", "IVZ", "TROW"},
+        "peers": ["BLK", "BX", "KKR", "APO", "ARES"],
+    },
+    "INSURANCE": {
+        "industry": "Multi-Line & Property Casualty Insurance",
+        "tickers": {"BRK-A", "BRK-B", "PGR", "ALL", "TRV", "CB", "MET", "PRU", "AIG", "AFL"},
+        "peers": ["BRK-B", "PGR", "ALL", "TRV", "CB"],
+    },
+    "MEGA_TECH": {
+        "industry": "Mega-Cap Interactive Media & Platforms",
+        "tickers": {"AAPL", "MSFT", "GOOGL", "GOOG", "AMZN", "META", "NFLX"},
+        "peers": ["AAPL", "MSFT", "GOOGL", "AMZN", "META"],
+    },
+    "SEMICONDUCTORS": {
+        "industry": "Semiconductors & AI Compute Hardware",
+        "tickers": {"NVDA", "AMD", "INTC", "TSM", "AVGO", "QCOM", "MU", "ASML", "ARM", "MRVL", "TXN", "LRCX", "AMAT", "KLAC", "ADI"},
+        "peers": ["NVDA", "AMD", "INTC", "TSM", "AVGO"],
+    },
+    "ENTERPRISE_SOFTWARE": {
+        "industry": "Systems & Cloud Enterprise Applications",
+        "tickers": {"CRM", "ORCL", "ADBE", "NOW", "SAP", "SNOW", "WDAY", "PLTR", "INTU", "DDOG", "MDB", "TEAM", "HUBS"},
+        "peers": ["CRM", "NOW", "ORCL", "ADBE", "SNOW"],
+    },
+    "CYBERSECURITY": {
+        "industry": "Cybersecurity & Network Defense",
+        "tickers": {"PANW", "CRWD", "FTNT", "ZS", "NET", "S", "OKTA", "GEN", "CYBR"},
+        "peers": ["PANW", "CRWD", "FTNT", "ZS", "NET"],
+    },
+    "COMMUNICATIONS_EQUIPMENT": {
+        "industry": "Communications Equipment & Public Safety",
+        "tickers": {"MSI", "CSCO", "ANET", "HPE", "DELL", "JNPR", "CIEN", "ZBRA"},
+        "peers": ["MSI", "CSCO", "ANET", "HPE", "ZBRA"],
+    },
+    "TELECOM_MEDIA": {
+        "industry": "Telecommunications & Media Networks",
+        "tickers": {"T", "VZ", "TMUS", "BCE", "CMCSA", "CHTR", "DIS", "WBD", "PARA", "FOXA"},
+        "peers": ["T", "VZ", "TMUS", "CMCSA", "DIS"],
+    },
+    "AEROSPACE_DEFENSE": {
+        "industry": "Aerospace & Defense Systems",
+        "tickers": {"BA", "LMT", "RTX", "NOC", "GD", "LHX", "TDG", "HWM", "TXT"},
+        "peers": ["BA", "LMT", "RTX", "NOC", "GD"],
+    },
+    "INDUSTRIAL_MACHINERY": {
+        "industry": "Industrial Machinery & Heavy Equipment",
+        "tickers": {"CAT", "DE", "GE", "HON", "MMM", "EMR", "ITW", "PCAR", "CMI", "ETN"},
+        "peers": ["CAT", "DE", "GE", "HON", "MMM"],
+    },
+    "LOGISTICS_TRANSPORT": {
+        "industry": "Freight, Logistics & Air Transportation",
+        "tickers": {"FDX", "UPS", "UNP", "CSX", "NSC", "DAL", "UAL", "LUV", "EXPD"},
+        "peers": ["FDX", "UPS", "UNP", "CSX", "DAL"],
+    },
+    "AUTOMOTIVE": {
+        "industry": "Automotive Manufacturing & Electric Mobility",
+        "tickers": {"TSLA", "F", "GM", "RIVN", "TM", "HMC", "RACE", "STLA", "LCID", "NIO"},
+        "peers": ["TSLA", "F", "GM", "TM", "RIVN"],
+    },
+    "RESTAURANTS_QSR": {
+        "industry": "Quick Service Restaurants & Food Franchising",
+        "tickers": {"MCD", "YUM", "QSR", "WEN", "SBUX", "CMG", "DPZ", "DRI", "WING"},
+        "peers": ["MCD", "YUM", "QSR", "WEN", "SBUX"],
+    },
+    "CONSUMER_RETAIL": {
+        "industry": "Broadline Retail & Mass Merchandising",
+        "tickers": {"WMT", "COST", "TGT", "HD", "LOW", "BBY", "DG", "DLTR", "TJX", "ROST", "EBAY"},
+        "peers": ["WMT", "COST", "TGT", "HD", "LOW"],
+    },
+    "CONSUMER_STAPLES": {
+        "industry": "Packaged Foods & Household Products",
+        "tickers": {"PG", "KO", "PEP", "MDLZ", "CL", "KMB", "GIS", "HSY", "MNST", "STZ", "K"},
+        "peers": ["PG", "KO", "PEP", "MDLZ", "CL"],
+    },
+    "PHARMACEUTICALS": {
+        "industry": "Pharmaceuticals & Biotechnology",
+        "tickers": {"LLY", "UNH", "JNJ", "ABBV", "MRK", "PFE", "NVO", "AZN", "BMY", "AMGN", "GILD", "VRTX", "BIIB"},
+        "peers": ["LLY", "JNJ", "ABBV", "MRK", "PFE"],
+    },
+    "MEDICAL_DEVICES": {
+        "industry": "Medical Technology & Life Sciences",
+        "tickers": {"MDT", "ABT", "ISRG", "SYK", "BSX", "EW", "DXCM", "BDX", "TMO", "DHR"},
+        "peers": ["MDT", "ABT", "ISRG", "SYK", "BSX"],
+    },
+    "ENERGY_OIL_GAS": {
+        "industry": "Integrated Oil, Gas & Consumable Fuels",
+        "tickers": {"XOM", "CVX", "COP", "SLB", "EOG", "OXY", "BP", "SHEL", "TTE", "HAL", "VLO", "MPC", "PSX", "KMI"},
+        "peers": ["XOM", "CVX", "COP", "SLB", "EOG"],
+    },
+    "UTILITIES": {
+        "industry": "Electric Utilities & Renewable Power",
+        "tickers": {"NEE", "DUK", "SO", "AEP", "EXC", "SRE", "D", "PCG", "XEL", "ED"},
+        "peers": ["NEE", "DUK", "SO", "AEP", "EXC"],
+    },
+    "REITS": {
+        "industry": "Real Estate Investment Trusts (REITs)",
+        "tickers": {"PLD", "AMT", "EQIX", "SPG", "O", "PSA", "CCI", "DLR", "WELL", "VTR"},
+        "peers": ["PLD", "AMT", "EQIX", "SPG", "O"],
+    },
+    "MATERIALS_MINING": {
+        "industry": "Metals, Mining & Basic Materials",
+        "tickers": {"BHP", "RIO", "FCX", "NEM", "VALE", "LIN", "APD", "ECL", "SHW", "NUE"},
+        "peers": ["BHP", "RIO", "FCX", "NEM", "VALE"],
+    },
 }
 
 class EquitiesFeed:
@@ -1188,45 +1382,45 @@ class EquitiesFeed:
     def get_relative_valuation(self, symbol: str) -> Dict[str, Any]:
         """
         Relative Valuation (RV) Peer Comparison Matrix.
+        Synchronous / offline baseline resolver with full GICS industry coverage.
         """
         sym = symbol.upper()
         price = self.get_security_price(sym)
-        rv_groups = {
-            "MCD": {
-                "industry": "Quick Service Restaurants & Franchising",
-                "peers": [
-                    {"symbol": "MCD", "name": "McDonald's Corp", "price": 301.16, "pe": 26.4, "fwd_pe": 23.2, "ev_ebitda": 18.5, "ps": 8.5, "op_margin": "45.8%", "roe": "N/A", "div_yield": "2.22%"},
-                    {"symbol": "YUM", "name": "Yum! Brands Inc", "price": 135.40, "pe": 24.1, "fwd_pe": 21.0, "ev_ebitda": 17.2, "ps": 5.4, "op_margin": "32.4%", "roe": "N/A", "div_yield": "1.98%"},
-                    {"symbol": "QSR", "name": "Restaurant Brands Intl", "price": 72.85, "pe": 19.8, "fwd_pe": 17.5, "ev_ebitda": 14.6, "ps": 4.8, "op_margin": "29.1%", "roe": "28.5%", "div_yield": "3.18%"},
-                    {"symbol": "WEN", "name": "Wendy's Co", "price": 17.20, "pe": 18.2, "fwd_pe": 16.1, "ev_ebitda": 13.8, "ps": 1.7, "op_margin": "17.8%", "roe": "42.1%", "div_yield": "5.81%"},
-                    {"symbol": "SBUX", "name": "Starbucks Corp", "price": 96.50, "pe": 28.5, "fwd_pe": 24.8, "ev_ebitda": 16.9, "ps": 3.1, "op_margin": "15.2%", "roe": "N/A", "div_yield": "2.36%"}
-                ]
-            },
-            "NVDA": {
-                "industry": "Semiconductors & AI Accelerators",
-                "peers": [
-                    {"symbol": "NVDA", "name": "Nvidia Corp", "price": 118.90, "pe": 45.2, "fwd_pe": 32.1, "ev_ebitda": 36.4, "ps": 24.1, "op_margin": "64.9%", "roe": "115.6%", "div_yield": "0.03%"},
-                    {"symbol": "AMD", "name": "Advanced Micro Devices", "price": 152.80, "pe": 112.5, "fwd_pe": 28.4, "ev_ebitda": 42.1, "ps": 10.4, "op_margin": "11.2%", "roe": "3.8%", "div_yield": "0.00%"},
-                    {"symbol": "INTC", "name": "Intel Corp", "price": 20.80, "pe": "N/A", "fwd_pe": 18.5, "ev_ebitda": 9.2, "ps": 1.6, "op_margin": "1.2%", "roe": "-3.2%", "div_yield": "2.40%"},
-                    {"symbol": "TSM", "name": "Taiwan Semiconductor", "price": 174.20, "pe": 28.1, "fwd_pe": 22.5, "ev_ebitda": 14.8, "ps": 11.2, "op_margin": "42.5%", "roe": "27.4%", "div_yield": "1.24%"},
-                    {"symbol": "AVGO", "name": "Broadcom Inc", "price": 168.40, "pe": 65.2, "fwd_pe": 27.8, "ev_ebitda": 22.4, "ps": 15.6, "op_margin": "38.6%", "roe": "18.2%", "div_yield": "1.26%"}
-                ]
-            }
-        }
 
-        default_group = {
-            "industry": "Peer Benchmark Group",
-            "peers": [
-                {"symbol": sym, "name": f"{sym} Corp", "price": price, "pe": 22.5, "fwd_pe": 19.4, "ev_ebitda": 15.2, "ps": 3.8, "op_margin": "24.5%", "roe": "18.2%", "div_yield": "1.50%"},
-                {"symbol": "PEER1", "name": "Industry Peer Alpha", "price": 85.40, "pe": 20.1, "fwd_pe": 18.0, "ev_ebitda": 14.1, "ps": 3.2, "op_margin": "21.0%", "roe": "15.4%", "div_yield": "1.80%"},
-                {"symbol": "PEER2", "name": "Industry Peer Beta", "price": 112.20, "pe": 25.4, "fwd_pe": 21.5, "ev_ebitda": 16.8, "ps": 4.5, "op_margin": "26.4%", "roe": "20.1%", "div_yield": "1.20%"}
-            ]
-        }
-        group = rv_groups.get(sym, default_group)
+        matched_cluster = None
+        for cluster in GICS_PEER_CLUSTERS.values():
+            if sym in cluster["tickers"]:
+                matched_cluster = cluster
+                break
+
+        if matched_cluster:
+            industry = matched_cluster["industry"]
+            raw_peers = [sym] + [p for p in matched_cluster["peers"] if p != sym][:4]
+        else:
+            industry = "Broad Market Benchmark Group"
+            raw_peers = [sym, "AAPL", "MSFT", "NVDA", "AMZN"]
+
+        peers = []
+        for p_sym in raw_peers:
+            base = PEER_BASELINES.get(p_sym.upper(), {})
+            p_price = price if p_sym == sym and price > 0 else base.get("price", 100.0)
+            peers.append({
+                "symbol": p_sym,
+                "name": base.get("name", f"{p_sym} Corp"),
+                "price": round(float(p_price), 2),
+                "pe": base.get("pe", 22.5),
+                "fwd_pe": base.get("fwd_pe", 19.4),
+                "ev_ebitda": base.get("ev_ebitda", 15.2),
+                "ps": base.get("ps", 3.8),
+                "op_margin": base.get("op_margin", "24.5%"),
+                "roe": base.get("roe", "18.2%"),
+                "div_yield": base.get("div_yield", "1.50%")
+            })
+
         return {
             "symbol": sym,
-            "industry": group["industry"],
-            "peers": group["peers"]
+            "industry": industry,
+            "peers": peers
         }
 
     def get_earnings_estimates(self, symbol: str) -> Dict[str, Any]:
@@ -1786,45 +1980,69 @@ class EquitiesFeed:
                 "peers": peers
             }
 
-        tech_peers = ["AAPL", "MSFT", "GOOGL", "AMZN", "META"]
-        qsr_peers = ["MCD", "YUM", "QSR", "WEN", "SBUX"]
-        semi_peers = ["NVDA", "AMD", "INTC", "TSM", "AVGO"]
-        fin_peers = ["JPM", "BAC", "WFC", "GS", "MS"]
-        auto_peers = ["TSLA", "F", "GM", "RIVN", "TM"]
-        health_peers = ["LLY", "UNH", "JNJ", "ABBV", "MRK"]
-        energy_peers = ["XOM", "CVX", "COP", "SLB", "EOG"]
-        retail_peers = ["WMT", "COST", "TGT", "HD", "LOW"]
+        # Check curated GICS peer clusters first
+        matched_cluster = None
+        for cluster in GICS_PEER_CLUSTERS.values():
+            if sym in cluster["tickers"]:
+                matched_cluster = cluster
+                break
 
-        if sym in qsr_peers:
-            peer_syms = qsr_peers
-            industry = "Quick Service Restaurants & Franchising"
-        elif sym in semi_peers:
-            peer_syms = semi_peers
-            industry = "Semiconductors & AI Compute"
-        elif sym in tech_peers:
-            peer_syms = tech_peers
-            industry = "Mega-Cap Technology & Platforms"
-        elif sym in fin_peers:
-            peer_syms = fin_peers
-            industry = "Diversified Banking & Financial Services"
-        elif sym in auto_peers:
-            peer_syms = auto_peers
-            industry = "Automotive & Electric Vehicles"
-        elif sym in health_peers:
-            peer_syms = health_peers
-            industry = "Pharmaceuticals & Healthcare"
-        elif sym in energy_peers:
-            peer_syms = energy_peers
-            industry = "Integrated Oil, Gas & Energy"
-        elif sym in retail_peers:
-            peer_syms = retail_peers
-            industry = "Consumer Retail & Merchandising"
+        if matched_cluster:
+            industry = matched_cluster["industry"]
+            peer_syms = [sym] + [p for p in matched_cluster["peers"] if p != sym][:4]
         else:
-            peer_syms = [sym, "AAPL", "MSFT", "NVDA", "AMZN"]
-            industry = "Comparative Benchmark Group"
+            # Dynamic upstream discovery via algorithmic recommendations and asset profile
+            recs_task = market_data_client.get_peer_recommendations(sym)
+            profile_task = market_data_client.get_quote_summary(sym, ["assetProfile"])
+            recs_res, summary_res = await asyncio.gather(recs_task, profile_task, return_exceptions=True)
+
+            recs = recs_res if isinstance(recs_res, list) else []
+            profile = summary_res.get("assetProfile", {}) if isinstance(summary_res, dict) else {}
+            sec = (profile.get("sector") or "").upper()
+            ind = profile.get("industry") or profile.get("sector")
+
+            # Sector cluster fallback mapping
+            sec_cluster = None
+            if "FINANC" in sec or "BANK" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["DIVERSIFIED_BANKS"]
+            elif "SEMI" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["SEMICONDUCTORS"]
+            elif "SOFTWARE" in sec or "CLOUD" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["ENTERPRISE_SOFTWARE"]
+            elif "TECH" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["MEGA_TECH"]
+            elif "HEALTH" in sec or "PHARMA" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["PHARMACEUTICALS"]
+            elif "ENERGY" in sec or "OIL" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["ENERGY_OIL_GAS"]
+            elif "INDUSTRI" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["INDUSTRIAL_MACHINERY"]
+            elif "DEFENSIVE" in sec or "STAPLE" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["CONSUMER_STAPLES"]
+            elif "CYCLIC" in sec or "DISCRETION" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["CONSUMER_RETAIL"]
+            elif "COMMUNICAT" in sec or "TELECOM" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["TELECOM_MEDIA"]
+            elif "UTILIT" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["UTILITIES"]
+            elif "REAL ESTATE" in sec or "REIT" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["REITS"]
+            elif "MATERIAL" in sec or "MINING" in sec:
+                sec_cluster = GICS_PEER_CLUSTERS["MATERIALS_MINING"]
+
+            valid_recs = [r for r in recs if r != sym and len(r) <= 5]
+            if len(valid_recs) >= 2:
+                peer_syms = [sym] + valid_recs[:4]
+                industry = ind or (sec_cluster["industry"] if sec_cluster else "GICS Peer Benchmark Group")
+            elif sec_cluster:
+                peer_syms = [sym] + [p for p in sec_cluster["peers"] if p != sym][:4]
+                industry = ind or sec_cluster["industry"]
+            else:
+                peer_syms = [sym, "AAPL", "MSFT", "GOOGL", "AMZN"]
+                industry = ind or "Broad Market Benchmark Group"
 
         if sym not in peer_syms:
-            peer_syms = [sym] + peer_syms[:4]
+            peer_syms = [sym] + [p for p in peer_syms if p != sym][:4]
 
         quotes_task = market_data_client.get_quotes(peer_syms)
         summaries_tasks = [

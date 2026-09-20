@@ -247,6 +247,33 @@ async def test_command_rv():
     assert len(res_crypto["data"]["peers"]) >= 3
     assert res_crypto["data"]["peers"][0]["price"] > 0
 
+    # Verify BMO Bank RV: must return Canadian bank peers and never mega-cap tech
+    res_bmo = await execute_command(CommandRequest(command="BMO RV <GO>"))
+    assert res_bmo["success"] is True
+    rv_bmo = res_bmo["data"]
+    assert rv_bmo["symbol"] == "BMO"
+    assert "Bank" in rv_bmo["industry"]
+    bmo_peer_syms = [p["symbol"] for p in rv_bmo["peers"]]
+    assert "BMO" in bmo_peer_syms
+    assert any(bank in bmo_peer_syms for bank in ["RY", "TD", "BNS", "CM"])
+    # Crucial regression invariant: AAPL, MSFT, NVDA, AMZN must never be peers of BMO
+    assert "AAPL" not in bmo_peer_syms
+    assert "MSFT" not in bmo_peer_syms
+    assert "NVDA" not in bmo_peer_syms
+    assert "AMZN" not in bmo_peer_syms
+
+    # Verify MSI Communications RV: must return communications hardware peers
+    res_msi = await execute_command(CommandRequest(command="MSI RV <GO>"))
+    assert res_msi["success"] is True
+    rv_msi = res_msi["data"]
+    assert rv_msi["symbol"] == "MSI"
+    assert "Communications" in rv_msi["industry"] or "Equipment" in rv_msi["industry"]
+    msi_peer_syms = [p["symbol"] for p in rv_msi["peers"]]
+    assert "MSI" in msi_peer_syms
+    assert any(comm in msi_peer_syms for comm in ["CSCO", "ANET", "HPE", "ZBRA"])
+    assert "AAPL" not in msi_peer_syms
+    assert "NVDA" not in msi_peer_syms
+
 
 @pytest.mark.asyncio
 async def test_prefix_syntax_support():
