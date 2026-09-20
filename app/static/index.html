@@ -89,6 +89,7 @@
             <button class="btn-interval" data-interval="1H">1H</button>
             <button class="btn-interval" data-interval="1D">1D</button>
           </div>
+          <button class="btn-panel-action" data-action="maximize" data-panel="panelChart" title="Maximize Pane (Esc to restore)">[MAX]</button>
         </div>
       </div>
       <div class="panel-body" style="padding: 0;">
@@ -105,7 +106,10 @@
           <span class="badge">L2</span>
           <span>LEVEL 2 ORDER BOOK DEPTH LADDER</span>
         </div>
-        <div class="neu" style="font-size: 10px;">SUB-25MS FEED</div>
+        <div class="panel-actions">
+          <span class="neu" style="font-size: 10px;">SUB-25MS FEED</span>
+          <button class="btn-panel-action" data-action="maximize" data-panel="panelOrderBook" title="Maximize Pane (Esc to restore)">[MAX]</button>
+        </div>
       </div>
       <div class="panel-body" id="orderbookContainer">
         <div class="neu" style="padding: 10px;">Connecting to market depth stream...</div>
@@ -119,7 +123,11 @@
           <span class="badge">WEI</span>
           <span>WORLD EQUITY INDICES MONITOR</span>
         </div>
-        <div class="neu" style="font-size: 10px;">CLICK ROW TO LOAD</div>
+        <div class="panel-actions">
+          <button class="btn-panel-action" id="btnExportWEI" title="Export WEI table to CSV">[CSV]</button>
+          <span class="neu" style="font-size: 10px;">CLICK ROW TO LOAD</span>
+          <button class="btn-panel-action" data-action="maximize" data-panel="panelWEI" title="Maximize Pane (Esc to restore)">[MAX]</button>
+        </div>
       </div>
       <div class="panel-body" style="padding: 0;">
         <table class="table-data" id="weiTable">
@@ -146,7 +154,10 @@
           <span class="badge">TOP / YCRV</span>
           <span>MACRO RATES &amp; BREAKING WIRE</span>
         </div>
-        <div class="neu" style="font-size: 10px;">REAL-TIME TICKER</div>
+        <div class="panel-actions">
+          <span class="neu" style="font-size: 10px;">REAL-TIME TICKER</span>
+          <button class="btn-panel-action" data-action="maximize" data-panel="panelNews" title="Maximize Pane (Esc to restore)">[MAX]</button>
+        </div>
       </div>
       <div class="panel-body panel-split">
         <div class="split-col split-rates" id="yieldCurveData"></div>
@@ -165,7 +176,10 @@
         <span class="badge" id="modalBadge">DES</span>
         <span id="modalHeading">SECURITY DESCRIPTION</span>
       </div>
-      <button class="modal-close" id="modalClose">&lt;CNCL&gt;</button>
+      <div style="display: flex; gap: 8px; align-items: center;">
+        <button class="btn-export hidden" id="modalExportBtn">[EXPORT CSV]</button>
+        <button class="modal-close" id="modalClose">&lt;CNCL&gt;</button>
+      </div>
     </div>
     <div class="modal-body" id="modalBody">
       <!-- Injected dynamically -->
@@ -180,6 +194,7 @@
       <button id="toggleAudio" class="btn-footer">AUDIO: OFF</button>
       <button id="toggleCrt" class="btn-footer active">CRT: ON</button>
       <button id="toggleClock" class="btn-footer">TIME: EST</button>
+      <button id="btnHotkeys" class="btn-footer" title="Click for Bloomberg Keyboard Cheat Sheet">HOTKEYS: F1-F12</button>
     </div>
     <div class="footer-cluster">
       <div id="wsLatency">WS: CONNECTING...</div>
@@ -189,8 +204,8 @@
 
   <!-- Scripts -->
   <script src="/static/js/lightweight-charts.standalone.production.js?v=4.2.1"></script>
-  <script src="/static/js/chart.js?v=2.2.0"></script>
-  <script src="/static/js/orderbook.js?v=2.2.0"></script>
-  <script src="/static/js/terminal.js?v=2.2.0"></script>
+  <script src="/static/js/chart.js?v=2.3.0"></script>
+  <script src="/static/js/orderbook.js?v=2.3.0"></script>
+  <script src="/static/js/terminal.js?v=2.3.0"></script>
 </body>
 </html>
