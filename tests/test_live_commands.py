@@ -71,6 +71,20 @@ async def test_command_des():
     des = res["data"]
     assert des["symbol"] == "AAPL"
     assert "Apple" in des["name"] or "APPLE" in des["name"].upper()
+    assert "price" in des and "change" in des and "change_pct" in des
+    assert "pe" in des and "fwd_pe" in des and "eps" in des
+    assert "shares_out" in des and "range_52w" in des and "div_yield" in des
+
+    # Verify MSI DES specific field resolution
+    res_msi = await execute_command(CommandRequest(command="MSI DES <GO>"))
+    assert res_msi["success"] is True
+    des_msi = res_msi["data"]
+    assert des_msi["symbol"] == "MSI"
+    assert "Motorola" in des_msi["name"] or "MOTOROLA" in des_msi["name"].upper()
+    assert des_msi["price"] > 300.0
+    assert des_msi["exchange"] in ("NYSE", "NYQ", "NYSE/NASDAQ")
+    assert des_msi["shares_out"] != "N/A"
+    assert des_msi["revenue"] != "N/A"
 
 @pytest.mark.asyncio
 async def test_command_des_crypto():
@@ -79,6 +93,7 @@ async def test_command_des_crypto():
     des = res["data"]
     assert des["symbol"] == "ETHUSDT"
     assert des["sector"] == "CRNCY"
+    assert "exchange" in des and "change" in des and "revenue" in des
 
 @pytest.mark.asyncio
 async def test_command_ycrv():
@@ -159,6 +174,14 @@ async def test_command_omon():
     opts_eth = res_eth["data"]
     assert opts_eth["spot_price"] > 2000.0
     assert opts_eth["chain"][0]["strike"] > 1500.0
+
+    # Verify equity with asymmetric call/put strikes (MSI)
+    res_msi = await execute_command(CommandRequest(command="MSI OMON <GO>"))
+    assert res_msi["success"] is True
+    opts_msi = res_msi["data"]
+    assert opts_msi["symbol"] == "MSI"
+    assert opts_msi["spot_price"] > 300.0
+    assert len(opts_msi["chain"]) >= 5
 
 @pytest.mark.asyncio
 async def test_command_maps():
