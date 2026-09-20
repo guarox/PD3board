@@ -41,6 +41,14 @@ def test_equities_feed():
     assert rv["symbol"] == "MCD"
     assert len(rv["peers"]) >= 4
 
+    rv_bmo = feed.get_relative_valuation("BMO")
+    assert rv_bmo["symbol"] == "BMO"
+    assert "Bank" in rv_bmo["industry"]
+    bmo_peers = [p["symbol"] for p in rv_bmo["peers"]]
+    assert "BMO" in bmo_peers
+    assert "RY" in bmo_peers
+    assert "AAPL" not in bmo_peers
+
     ee = feed.get_earnings_estimates("MCD")
     assert ee["symbol"] == "MCD"
     assert len(ee["quarterly_history"]) >= 4

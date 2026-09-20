@@ -258,6 +258,40 @@ class MarketDataClient:
             logger.warning("Error fetching quote summary for %s: %s", sym, e)
         return {}
 
+    async def get_peer_recommendations(self, symbol: str) -> List[str]:
+        """
+        Fetch real market/GICS algorithmic peer recommendations for a given security.
+        Uses Yahoo Finance recommendationsbysymbol endpoint with query2 and query1 fallback.
+        """
+        sym = GLOBAL_SYMBOL_MAP.get(symbol.strip().upper(), symbol.strip().upper())
+        cache_key = f"peers:{sym}"
+        cached = self._get_from_cache(cache_key)
+        if cached is not None:
+            return cached
+
+        session = await self.get_session()
+        for host in ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]:
+            url = f"https://{host}/v6/finance/recommendationsbysymbol/{sym}"
+            try:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as r:
+                    if r.status == 200:
+                        data = await r.json()
+                        res_list = data.get("finance", {}).get("result", [])
+                        if res_list:
+                            raw_recs = res_list[0].get("recommendedSymbols", [])
+                            recs = [
+                                item["symbol"].strip().upper()
+                                for item in raw_recs
+                                if isinstance(item, dict) and item.get("symbol")
+                            ]
+                            filtered_recs = [s for s in recs if s != sym][:6]
+                            if filtered_recs:
+                                self._set_cache(cache_key, filtered_recs, ttl_seconds=3600)
+                                return filtered_recs
+            except Exception as e:
+                logger.warning("Error fetching peer recommendations for %s from %s: %s", sym, host, e)
+        return []
+
     async def get_kraken_candles(self, pair: str = "XBTUSD", interval: int = 1) -> List[Dict[str, Any]]:
         """
         Redundant secondary crypto candle provider via Kraken Public OHLC API.
