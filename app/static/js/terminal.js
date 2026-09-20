@@ -86,6 +86,7 @@ class TerminalController {
     this.marketSessions = { NYSE: 'CLOSED', LSE: 'CLOSED', TSE: 'OPEN', CRNCY: 'OPEN' };
 
     this.initUI();
+    this.loadState();
     this.initWebSocket();
     this.initClock();
     this.updateMarketStatus(this.marketSessions);
@@ -121,6 +122,7 @@ class TerminalController {
           this.priceChart.setInterval(interval);
         }
         this.loadHistoricalData(this.currentTicker, interval);
+        this.saveState();
         this.sound.playKeyClick();
       });
     });
@@ -133,6 +135,7 @@ class TerminalController {
           const active = this.priceChart.toggleIndicator(ind);
           btn.classList.toggle('active', active);
         }
+        this.saveState();
         this.sound.playKeyClick();
       });
     });
@@ -163,8 +166,34 @@ class TerminalController {
       });
     }
 
-    // Global keyboard listener
+    // Bloomberg Dedicated Function Keys (F1 - F12) & Global Shortcuts
     window.addEventListener('keydown', (e) => {
+      const fnKeyMap = {
+        'F1': 'HELP',
+        'F2': 'WEI',
+        'F3': 'YCRV',
+        'F4': 'ECO',
+        'F5': 'TOP',
+        'F6': 'GP',
+        'F7': 'L2',
+        'F8': 'DES',
+        'F9': 'FA',
+        'F10': 'ANR',
+        'F11': 'EE',
+        'F12': 'OMON'
+      };
+
+      if (fnKeyMap[e.key]) {
+        e.preventDefault();
+        const mnemonic = fnKeyMap[e.key];
+        if (['WEI', 'ECO', 'YCRV', 'TOP', 'HELP'].includes(mnemonic)) {
+          this.executeCommand(`${mnemonic} <GO>`);
+        } else {
+          this.executeCommand(`${this.currentTicker} ${this.currentSector} ${mnemonic} <GO>`);
+        }
+        return;
+      }
+
       if (e.key === '/' && document.activeElement !== this.cmdInput) {
         e.preventDefault();
         this.cmdInput.focus();
@@ -173,6 +202,8 @@ class TerminalController {
       } else if (e.key === 'Escape') {
         if (!document.getElementById('terminalModal').classList.contains('hidden')) {
           this.closeModal();
+        } else if (this.restoreAllPanels()) {
+          // Maximized quadrant was successfully restored
         } else if (this.cmdInput) {
           this.cmdInput.value = '';
           this.cmdInput.blur();
@@ -206,6 +237,7 @@ class TerminalController {
       btnCancel.addEventListener('click', () => {
         if (this.cmdInput) this.cmdInput.value = '';
         this.closeModal();
+        this.restoreAllPanels();
         this.sound.playKeyClick();
       });
     }
@@ -219,6 +251,30 @@ class TerminalController {
         this.sound.playKeyClick();
       });
     });
+
+    // Quadrant Maximize / Restore Buttons
+    document.querySelectorAll('.btn-panel-action[data-action="maximize"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const panelId = btn.dataset.panel;
+        this.toggleMaximizePanel(panelId);
+      });
+    });
+
+    // WEI Table CSV Export Button
+    const btnExportWEI = document.getElementById('btnExportWEI');
+    if (btnExportWEI) {
+      btnExportWEI.addEventListener('click', () => {
+        this.exportTableToCSV(document.getElementById('weiTable'), 'WORLD_EQUITY_INDICES_WEI.csv');
+      });
+    }
+
+    // Hotkeys Footer Cheat Sheet Button
+    const btnHotkeys = document.getElementById('btnHotkeys');
+    if (btnHotkeys) {
+      btnHotkeys.addEventListener('click', () => {
+        this.executeCommand('HELP <GO>');
+      });
+    }
 
     // Modal Close Button
     const modalClose = document.getElementById('modalClose');
@@ -238,6 +294,7 @@ class TerminalController {
         toggleAudio.innerText = `AUDIO: ${this.sound.enabled ? 'ON' : 'OFF'}`;
         toggleAudio.classList.toggle('active', this.sound.enabled);
         if (this.sound.enabled) this.sound.playGoSound();
+        this.saveState();
       });
     }
 
@@ -249,6 +306,7 @@ class TerminalController {
         crtOverlay.style.display = isVisible ? 'none' : 'block';
         toggleCrt.innerText = `CRT: ${isVisible ? 'OFF' : 'ON'}`;
         toggleCrt.classList.toggle('active', !isVisible);
+        this.saveState();
         this.sound.playKeyClick();
       });
     }
@@ -258,6 +316,7 @@ class TerminalController {
     const switchClock = () => {
       this.clockMode = this.clockMode === 'EST' ? 'UTC' : 'EST';
       if (toggleClock) toggleClock.innerText = `TIME: ${this.clockMode}`;
+      this.saveState();
       this.sound.playKeyClick();
     };
     if (toggleClock) toggleClock.addEventListener('click', switchClock);
@@ -539,6 +598,7 @@ class TerminalController {
         this.loadOrderBook(this.currentTicker);
         if (this.cmdInput) this.cmdInput.value = '';
       }
+      this.saveState();
     } catch (err) {
       console.error('Command execution failed:', err);
     }
@@ -549,6 +609,273 @@ class TerminalController {
     document.querySelectorAll('.fn-tab').forEach(t => {
       t.classList.toggle('active', t.dataset.fn === fn);
     });
+    this.saveState();
+  }
+
+  saveState() {
+    try {
+      const state = {
+        ticker: this.currentTicker,
+        sector: this.currentSector,
+        func: this.currentFunction,
+        interval: this.priceChart ? this.priceChart.interval : '1M',
+        indicators: this.priceChart ? Array.from(this.priceChart.activeIndicators || []) : [],
+        audio: this.sound ? this.sound.enabled : false,
+        crt: document.getElementById('crtOverlay') ? document.getElementById('crtOverlay').style.display !== 'none' : true,
+        clockMode: this.clockMode,
+        history: this.cmdHistory.slice(-50)
+      };
+      localStorage.setItem('pd3board_state', JSON.stringify(state));
+    } catch (e) {}
+  }
+
+  loadState() {
+    try {
+      const saved = localStorage.getItem('pd3board_state');
+      if (!saved) return;
+      const state = JSON.parse(saved);
+      if (state.ticker) this.currentTicker = state.ticker;
+      if (state.sector) this.currentSector = state.sector;
+      if (state.func) this.currentFunction = state.func;
+      if (state.history && Array.isArray(state.history)) this.cmdHistory = state.history;
+      if (state.clockMode) this.clockMode = state.clockMode;
+
+      // Audio
+      if (typeof state.audio === 'boolean' && this.sound) {
+        this.sound.enabled = state.audio;
+        const toggleAudio = document.getElementById('toggleAudio');
+        if (toggleAudio) {
+          toggleAudio.innerText = `AUDIO: ${state.audio ? 'ON' : 'OFF'}`;
+          toggleAudio.classList.toggle('active', state.audio);
+        }
+      }
+
+      // CRT
+      if (typeof state.crt === 'boolean') {
+        const crtOverlay = document.getElementById('crtOverlay');
+        const toggleCrt = document.getElementById('toggleCrt');
+        if (crtOverlay) crtOverlay.style.display = state.crt ? 'block' : 'none';
+        if (toggleCrt) {
+          toggleCrt.innerText = `CRT: ${state.crt ? 'ON' : 'OFF'}`;
+          toggleCrt.classList.toggle('active', state.crt);
+        }
+      }
+
+      // Clock
+      const toggleClock = document.getElementById('toggleClock');
+      if (toggleClock && state.clockMode) {
+        toggleClock.innerText = `TIME: ${state.clockMode}`;
+      }
+
+      // Interval button
+      if (state.interval) {
+        document.querySelectorAll('.btn-interval').forEach(b => {
+          b.classList.toggle('active', b.dataset.interval === state.interval);
+        });
+        if (this.priceChart) {
+          this.priceChart.setInterval(state.interval);
+        }
+      }
+
+      // Indicators
+      if (Array.isArray(state.indicators) && this.priceChart) {
+        document.querySelectorAll('.btn-indicator').forEach(b => {
+          const ind = b.dataset.indicator;
+          if (state.indicators.includes(ind)) {
+            this.priceChart.toggleIndicator(ind);
+            b.classList.add('active');
+          }
+        });
+      }
+
+      this.updateActiveSecurityBadge();
+    } catch (e) {
+      console.warn('Error loading state from localStorage:', e);
+    }
+  }
+
+  toggleMaximizePanel(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const isMax = panel.classList.toggle('maximized');
+
+    // Update button text for this panel
+    const btn = panel.querySelector('.btn-panel-action[data-action="maximize"]');
+    if (btn) {
+      btn.innerText = isMax ? '[RST]' : '[MAX]';
+      btn.classList.toggle('active', isMax);
+    }
+
+    // Unmaximize any other panels
+    document.querySelectorAll('.panel').forEach(p => {
+      if (p.id !== panelId && p.classList.contains('maximized')) {
+        p.classList.remove('maximized');
+        const otherBtn = p.querySelector('.btn-panel-action[data-action="maximize"]');
+        if (otherBtn) {
+          otherBtn.innerText = '[MAX]';
+          otherBtn.classList.remove('active');
+        }
+      }
+    });
+
+    window.dispatchEvent(new Event('resize'));
+    this.sound.playKeyClick();
+  }
+
+  restoreAllPanels() {
+    let hadMaximized = false;
+    document.querySelectorAll('.panel.maximized').forEach(p => {
+      p.classList.remove('maximized');
+      const btn = p.querySelector('.btn-panel-action[data-action="maximize"]');
+      if (btn) {
+        btn.innerText = '[MAX]';
+        btn.classList.remove('active');
+      }
+      hadMaximized = true;
+    });
+    if (hadMaximized) {
+      window.dispatchEvent(new Event('resize'));
+      return true;
+    }
+    return false;
+  }
+
+  exportTableToCSV(tableEl, filename = 'bloomberg_export.csv') {
+    if (!tableEl) return;
+    const rows = Array.from(tableEl.querySelectorAll('tr'));
+    if (!rows.length) return;
+
+    const csvContent = rows.map(row => {
+      const cells = Array.from(row.querySelectorAll('th, td'));
+      return cells.map(cell => {
+        let text = cell.innerText.replace(/"/g, '""').trim();
+        return `"${text}"`;
+      }).join(',');
+    }).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    this.sound.playChime();
+  }
+
+  setupModalExport(tableEl, filename) {
+    const btn = document.getElementById('modalExportBtn');
+    if (!btn) return;
+    if (tableEl) {
+      btn.classList.remove('hidden');
+      btn.onclick = () => {
+        this.exportTableToCSV(tableEl, filename);
+      };
+    } else {
+      btn.classList.add('hidden');
+    }
+  }
+
+  generateVolatilitySmileSVG(chain, spotPrice, maxPainStrike) {
+    if (!chain || chain.length === 0) return '';
+
+    const sorted = [...chain].sort((a, b) => a.strike - b.strike);
+    const strikes = sorted.map(s => Number(s.strike));
+    const minStrike = Math.min(...strikes);
+    const maxStrike = Math.max(...strikes);
+    const strikeRange = maxStrike - minStrike || 1;
+
+    const callIVs = sorted.map(s => Number(s.call_iv || 0.25));
+    const putIVs = sorted.map(s => Number(s.put_iv || 0.25));
+    const allIVs = [...callIVs, ...putIVs].filter(v => v > 0);
+    const minIV = Math.max(0.05, Math.min(...allIVs) * 0.9);
+    const maxIV = Math.min(1.2, Math.max(...allIVs) * 1.1);
+    const ivRange = maxIV - minIV || 0.1;
+
+    const svgWidth = 760;
+    const svgHeight = 160;
+    const padLeft = 55;
+    const padRight = 30;
+    const padTop = 25;
+    const padBottom = 25;
+    const plotW = svgWidth - padLeft - padRight;
+    const plotH = svgHeight - padTop - padBottom;
+
+    const getX = (strike) => padLeft + ((strike - minStrike) / strikeRange) * plotW;
+    const getY = (iv) => padTop + plotH - ((iv - minIV) / ivRange) * plotH;
+
+    let gridLines = '';
+    const numGridLevels = 4;
+    for (let i = 0; i <= numGridLevels; i++) {
+      const ivVal = minIV + (i / numGridLevels) * ivRange;
+      const y = getY(ivVal);
+      gridLines += `
+        <line x1="${padLeft}" y1="${y}" x2="${svgWidth - padRight}" y2="${y}" stroke="#222" stroke-dasharray="2,2" />
+        <text x="${padLeft - 8}" y="${y + 3}" fill="#666" font-size="9" text-anchor="end" font-family="monospace">${(ivVal * 100).toFixed(0)}%</text>
+      `;
+    }
+
+    const callPoints = sorted.map(s => ({ x: getX(s.strike), y: getY(Number(s.call_iv || 0.25)), strike: s.strike, iv: s.call_iv }));
+    const callPath = callPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+    const putPoints = sorted.map(s => ({ x: getX(s.strike), y: getY(Number(s.put_iv || 0.25)), strike: s.strike, iv: s.put_iv }));
+    const putPath = putPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+    let callCircles = callPoints.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#00ff66"><title>Call IV: ${(Number(p.iv || 0) * 100).toFixed(1)}% @ $${p.strike}</title></circle>`).join('');
+    let putCircles = putPoints.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#ff3344"><title>Put IV: ${(Number(p.iv || 0) * 100).toFixed(1)}% @ $${p.strike}</title></circle>`).join('');
+
+    let strikeLabels = sorted.map(s => {
+      const x = getX(s.strike);
+      return `<text x="${x.toFixed(1)}" y="${svgHeight - 8}" fill="#888" font-size="9" text-anchor="middle" font-family="monospace">$${s.strike}</text>`;
+    }).join('');
+
+    let spotMarker = '';
+    if (spotPrice && spotPrice >= minStrike && spotPrice <= maxStrike) {
+      const xSpot = getX(spotPrice);
+      spotMarker = `
+        <line x1="${xSpot.toFixed(1)}" y1="${padTop}" x2="${xSpot.toFixed(1)}" y2="${padTop + plotH}" stroke="#ffb000" stroke-width="1.5" stroke-dasharray="3,3" />
+        <rect x="${(xSpot - 38).toFixed(1)}" y="${(padTop - 18).toFixed(1)}" width="76" height="14" fill="#000" stroke="#ffb000" stroke-width="1" />
+        <text x="${xSpot.toFixed(1)}" y="${(padTop - 8).toFixed(1)}" fill="#ffb000" font-size="9" text-anchor="middle" font-weight="bold" font-family="monospace">SPOT $${Number(spotPrice).toFixed(1)}</text>
+      `;
+    }
+
+    let painMarker = '';
+    if (maxPainStrike && maxPainStrike >= minStrike && maxPainStrike <= maxStrike) {
+      const xPain = getX(maxPainStrike);
+      painMarker = `
+        <line x1="${xPain.toFixed(1)}" y1="${padTop}" x2="${xPain.toFixed(1)}" y2="${padTop + plotH}" stroke="#00f0ff" stroke-width="1.5" stroke-dasharray="3,3" />
+        <rect x="${(xPain - 44).toFixed(1)}" y="${(padTop + plotH + 3).toFixed(1)}" width="88" height="14" fill="#000" stroke="#00f0ff" stroke-width="1" />
+        <text x="${xPain.toFixed(1)}" y="${(padTop + plotH + 13).toFixed(1)}" fill="#00f0ff" font-size="9" text-anchor="middle" font-weight="bold" font-family="monospace">PAIN $${Number(maxPainStrike).toFixed(1)}</text>
+      `;
+    }
+
+    return `
+      <div class="vol-smile-container">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <div style="font-size: 11px; font-weight: bold; color: var(--amber-bright); letter-spacing: 0.5px;">
+            IMPLIED VOLATILITY SMILE &amp; SKEW CURVE (STRIKE VS IV)
+          </div>
+          <div style="display: flex; gap: 14px; font-size: 10px; font-family: monospace;">
+            <span style="color: #00ff66;">━ CALL IV</span>
+            <span style="color: #ff3344;">━ PUT IV</span>
+            <span style="color: #ffb000;">╎ SPOT</span>
+            <span style="color: #00f0ff;">╎ MAX PAIN</span>
+          </div>
+        </div>
+        <svg viewBox="0 0 ${svgWidth} ${svgHeight}" style="width: 100%; height: auto; background: #080808; border: 1px solid #1a1a1a;">
+          ${gridLines}
+          <path d="${callPath}" fill="none" stroke="#00ff66" stroke-width="2" />
+          <path d="${putPath}" fill="none" stroke="#ff3344" stroke-width="2" />
+          ${callCircles}
+          ${putCircles}
+          ${spotMarker}
+          ${painMarker}
+          ${strikeLabels}
+        </svg>
+      </div>
+    `;
   }
 
   fmtNum(val, dec = 2, fallback = 'N/A') {
@@ -588,6 +915,7 @@ class TerminalController {
         PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
       </div>
     `;
+    this.setupModalExport(null);
     modal.classList.remove('hidden');
   }
 
@@ -761,6 +1089,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(null);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering DES modal:', err);
@@ -837,6 +1166,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${anr.symbol || this.currentTicker}_ANR_ANALYST_RATINGS.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering ANR modal:', err);
@@ -903,6 +1233,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${fa.symbol || this.currentTicker}_FA_FINANCIAL_STATEMENTS.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering FA modal:', err);
@@ -968,6 +1299,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${rv.symbol || this.currentTicker}_RV_RELATIVE_VALUATION.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering RV modal:', err);
@@ -1084,6 +1416,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${ee.symbol || this.currentTicker}_EE_EARNINGS_SURPRISES.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering EE modal:', err);
@@ -1155,6 +1488,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), 'WIRP_FOMC_RATE_PROBABILITIES.csv');
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering WIRP modal:', err);
@@ -1217,6 +1551,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), 'WCRS_CURRENCY_RATES.csv');
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering WCRS modal:', err);
@@ -1277,6 +1612,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), 'FDM_COMMODITIES_FUTURES.csv');
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering FDM modal:', err);
@@ -1292,7 +1628,7 @@ class TerminalController {
     const body = document.getElementById('modalBody');
 
     badge.innerText = 'HELP';
-    heading.innerText = 'BLOOMBERG TERMINAL MNEMONIC & COMMAND DIRECTORY';
+    heading.innerText = 'BLOOMBERG TERMINAL WORKSTATION DIRECTORY & KEYBOARD SHORTCUTS';
 
     let funcsHtml = '';
     const funcs = helpData.functions || (helpData.help ? helpData.help.map(h => ({ mnemonic: h.mnemonic, desc: h.desc })) : []);
@@ -1301,7 +1637,38 @@ class TerminalController {
     });
 
     body.innerHTML = `
-      <div style="margin-bottom: 10px; color: var(--amber-bright); font-weight: bold;">AVAILABLE FUNCTION MNEMONICS</div>
+      <div style="margin-bottom: 10px; color: var(--amber-bright); font-weight: bold;">BLOOMBERG DEDICATED FUNCTION KEYS (F1 - F12)</div>
+      <table class="modal-table" style="margin-bottom: 14px;">
+        <thead><tr><th>HOTKEY</th><th>COMMAND / MNEMONIC</th><th>DESCRIPTION</th></tr></thead>
+        <tbody>
+          <tr><td><span class="hotkey-pill">F1</span></td><td><strong style="color: var(--amber-primary);">HELP &lt;GO&gt;</strong></td><td>Command directory, syntax reference, and keyboard guide</td></tr>
+          <tr><td><span class="hotkey-pill">F2</span></td><td><strong style="color: var(--amber-primary);">WEI &lt;GO&gt;</strong></td><td>World Equity Indices real-time multi-market overview</td></tr>
+          <tr><td><span class="hotkey-pill">F3</span></td><td><strong style="color: var(--amber-primary);">YCRV &lt;GO&gt;</strong></td><td>US Treasury Sovereign Yield Curve (1M to 30Y)</td></tr>
+          <tr><td><span class="hotkey-pill">F4</span></td><td><strong style="color: var(--amber-primary);">ECO &lt;GO&gt;</strong></td><td>Global Economic Calendar &amp; macroeconomic releases</td></tr>
+          <tr><td><span class="hotkey-pill">F5</span></td><td><strong style="color: var(--amber-primary);">TOP &lt;GO&gt;</strong></td><td>Breaking financial market headlines &amp; news wire</td></tr>
+          <tr><td><span class="hotkey-pill">F6</span></td><td><strong style="color: var(--amber-primary);">GP &lt;GO&gt;</strong></td><td>Graphical Price action candlestick chart with TradingView engine</td></tr>
+          <tr><td><span class="hotkey-pill">F7</span></td><td><strong style="color: var(--amber-primary);">L2 &lt;GO&gt;</strong></td><td>Level 2 live depth ladder order book &amp; liquidity visualizer</td></tr>
+          <tr><td><span class="hotkey-pill">F8</span></td><td><strong style="color: var(--amber-primary);">DES &lt;GO&gt;</strong></td><td>Security description, fundamental ratios, and valuation metrics</td></tr>
+          <tr><td><span class="hotkey-pill">F9</span></td><td><strong style="color: var(--amber-primary);">FA &lt;GO&gt;</strong></td><td>Financial analysis, income statement, and balance sheet breakdown</td></tr>
+          <tr><td><span class="hotkey-pill">F10</span></td><td><strong style="color: var(--amber-primary);">ANR &lt;GO&gt;</strong></td><td>Analyst recommendations, consensus ratings, and price targets</td></tr>
+          <tr><td><span class="hotkey-pill">F11</span></td><td><strong style="color: var(--amber-primary);">EE &lt;GO&gt;</strong></td><td>Earnings surprises, consensus estimates, and quarterly history</td></tr>
+          <tr><td><span class="hotkey-pill">F12</span></td><td><strong style="color: var(--amber-primary);">OMON &lt;GO&gt;</strong></td><td>Options monitor, Black-Scholes Greeks, and Volatility Smile curve</td></tr>
+        </tbody>
+      </table>
+
+      <div style="margin-bottom: 10px; color: var(--amber-bright); font-weight: bold;">WORKSTATION CONTROLS &amp; EXPORT</div>
+      <table class="modal-table" style="margin-bottom: 14px;">
+        <thead><tr><th>CONTROL</th><th>FUNCTION</th></tr></thead>
+        <tbody>
+          <tr><td><strong>[MAX] / [RST]</strong></td><td>Maximize any quadrant pane to full screen (Esc to restore)</td></tr>
+          <tr><td><strong>[EXPORT CSV]</strong></td><td>Export any tabular dataset (WEI, Options, Financials, Earnings) to CSV format</td></tr>
+          <tr><td><strong>AUDIO: ON/OFF</strong></td><td>Toggle vintage mechanical switch audio synthesizer for command feedback</td></tr>
+          <tr><td><strong>CRT: ON/OFF</strong></td><td>Toggle retro phosphor scanline and screen curvature simulation</td></tr>
+          <tr><td><strong>TIME: EST/UTC</strong></td><td>Switch between New York Market Time (EST) and Coordinated Universal Time (UTC)</td></tr>
+        </tbody>
+      </table>
+
+      <div style="margin-bottom: 10px; color: var(--amber-bright); font-weight: bold;">AVAILABLE MNEMONICS</div>
       <table class="modal-table" style="margin-bottom: 14px;">
         <thead><tr><th>COMMAND</th><th>FUNCTION DESCRIPTION</th></tr></thead>
         <tbody>${funcsHtml}</tbody>
@@ -1313,7 +1680,7 @@ class TerminalController {
         <tbody>
           <tr><td><strong>/</strong></td><td>Focus Bloomberg command line prompt immediately</td></tr>
           <tr><td><strong>Up / Down</strong></td><td>Recall previous / next executed commands from history</td></tr>
-          <tr><td><strong>&lt;ESC&gt;</strong></td><td>Clear input buffer or dismiss current modal dialog</td></tr>
+          <tr><td><strong>&lt;ESC&gt;</strong></td><td>Dismiss active modal, restore maximized pane, or clear input buffer</td></tr>
           <tr><td><strong>&lt;GO&gt; / Enter</strong></td><td>Execute entered mnemonic command</td></tr>
           <tr><td><strong>&lt;CNCL&gt;</strong></td><td>Cancel entered command line</td></tr>
           <tr><td><strong>&lt;TICKER&gt; [SECTOR] [FN] &lt;GO&gt;</strong></td><td>Standard Bloomberg command syntax (e.g. MCD US EQUITY GP &lt;GO&gt;)</td></tr>
@@ -1323,6 +1690,7 @@ class TerminalController {
         PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
       </div>
     `;
+    this.setupModalExport(null);
     modal.classList.remove('hidden');
   }
 
@@ -1379,6 +1747,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), 'ECO_ECONOMIC_CALENDAR.csv');
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering ECO modal:', err);
@@ -1400,8 +1769,14 @@ class TerminalController {
       badge.innerText = 'OMON';
       heading.innerText = `${omon.symbol || this.currentTicker} // OPTIONS MONITOR & BLACK-SCHOLES GREEKS`;
 
+      let totalCallVol = 0, totalPutVol = 0, totalCallOi = 0, totalPutOi = 0;
       let rowsHtml = '';
       (omon.chain || []).forEach(row => {
+        totalCallVol += Number(row.call_volume || 0);
+        totalPutVol += Number(row.put_volume || 0);
+        totalCallOi += Number(row.call_oi || 0);
+        totalPutOi += Number(row.put_oi || 0);
+
         const isAtm = row.is_atm;
         const isMaxPain = row.is_max_pain;
         const rowStyle = isAtm ? 'background: rgba(255, 176, 0, 0.12); font-weight: bold;' : (isMaxPain ? 'background: rgba(0, 240, 255, 0.1);' : '');
@@ -1428,25 +1803,39 @@ class TerminalController {
         `;
       });
 
+      const pcVolRatio = (totalPutVol / (totalCallVol || 1)).toFixed(2);
+      const pcOiRatio = (totalPutOi / (totalCallOi || 1)).toFixed(2);
+      const smileSvg = this.generateVolatilitySmileSVG(omon.chain || [], Number(omon.spot_price), Number(omon.max_pain_strike));
+
       body.innerHTML = `
-        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+        <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 12px; background: #141414; padding: 10px; border: 1px solid #282828;">
           <div>
-            <div style="font-size: 11px; color: var(--text-muted);">UNDERLYING SPOT</div>
-            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${this.fmtCur(omon.spot_price, 2)}</div>
+            <div style="font-size: 10px; color: var(--text-muted);">UNDERLYING SPOT</div>
+            <div style="font-size: 15px; font-weight: bold; color: var(--amber-bright);">${this.fmtCur(omon.spot_price, 2)}</div>
           </div>
-          <div style="border-left: 1px solid #282828; padding-left: 15px;">
-            <div style="font-size: 11px; color: var(--text-muted);">EXPIRATION (DTE)</div>
-            <div style="font-size: 16px; font-weight: bold; color: #fff;">${omon.expiration || 'FRONT'} (${omon.dte || 0} DTE)</div>
+          <div style="border-left: 1px solid #282828; padding-left: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted);">EXPIRATION (DTE)</div>
+            <div style="font-size: 15px; font-weight: bold; color: #fff;">${omon.expiration || 'FRONT'} (${omon.dte || 0} DTE)</div>
           </div>
-          <div style="border-left: 1px solid #282828; padding-left: 15px;">
-            <div style="font-size: 11px; color: var(--text-muted);">ATM VOLATILITY (IV)</div>
-            <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${this.fmtPct(Number(omon.atm_iv || 0) * 100, 1, false)}</div>
+          <div style="border-left: 1px solid #282828; padding-left: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted);">ATM VOLATILITY (IV)</div>
+            <div style="font-size: 15px; font-weight: bold; color: #00e5ff;">${this.fmtPct(Number(omon.atm_iv || 0) * 100, 1, false)}</div>
           </div>
-          <div style="border-left: 1px solid #282828; padding-left: 15px;">
-            <div style="font-size: 11px; color: var(--text-muted);">MAX PAIN STRIKE</div>
-            <div style="font-size: 16px; font-weight: bold; color: #ff00ea;">${this.fmtCur(omon.max_pain_strike, 2)}</div>
+          <div style="border-left: 1px solid #282828; padding-left: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted);">MAX PAIN STRIKE</div>
+            <div style="font-size: 15px; font-weight: bold; color: #ff00ea;">${this.fmtCur(omon.max_pain_strike, 2)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted);">PUT/CALL VOL RATIO</div>
+            <div style="font-size: 15px; font-weight: bold; color: ${pcVolRatio > 1 ? '#ff3344' : '#00ff66'};">${pcVolRatio}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 12px;">
+            <div style="font-size: 10px; color: var(--text-muted);">PUT/CALL OI RATIO</div>
+            <div style="font-size: 15px; font-weight: bold; color: ${pcOiRatio > 1 ? '#ff3344' : '#00ff66'};">${pcOiRatio}</div>
           </div>
         </div>
+
+        ${smileSvg}
 
         <div style="overflow-x: auto;">
           <table class="modal-table" style="font-size: 11px;">
@@ -1482,6 +1871,7 @@ class TerminalController {
           BLACK-SCHOLES CONTINUOUS FORMULATION // RISK-FREE RATE: 4.50% // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${omon.symbol || this.currentTicker}_OMON_OPTIONS_CHAIN.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering OMON modal:', err);
@@ -1574,6 +1964,7 @@ class TerminalController {
         });
       });
 
+      this.setupModalExport(null);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering MAPS modal:', err);
@@ -1678,6 +2069,7 @@ class TerminalController {
           PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
+      this.setupModalExport(null);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering AI modal:', err);
@@ -1761,6 +2153,7 @@ class TerminalController {
           DATA SOURCE: US SEC EDGAR ELECTRONIC FORM 4 SYSTEM // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${insd.symbol || this.currentTicker}_INSD_INSIDER_TRANSACTIONS.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering INSD modal:', err);
@@ -1838,6 +2231,7 @@ class TerminalController {
           DATA SOURCE: US SEC EDGAR FORM 13F-HR // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
         </div>
       `;
+      this.setupModalExport(body.querySelector('table'), `${hds.symbol || this.currentTicker}_HDS_INSTITUTIONAL_HOLDERS.csv`);
       modal.classList.remove('hidden');
     } catch (err) {
       console.error('Error rendering HDS modal:', err);
@@ -1848,6 +2242,8 @@ class TerminalController {
   closeModal() {
     const modal = document.getElementById('terminalModal');
     if (modal) modal.classList.add('hidden');
+    const modalExportBtn = document.getElementById('modalExportBtn');
+    if (modalExportBtn) modalExportBtn.classList.add('hidden');
     const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM', 'OMON', 'MAPS', 'AI', 'INSD', 'HDS'];
     if (modalFunctions.includes(this.currentFunction)) {
       this.setFunction('GP');
