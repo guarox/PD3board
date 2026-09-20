@@ -24,6 +24,7 @@ class OptionsFeed:
         "META": 512.0,
         "TSLA": 235.0,
         "MCD": 295.0,
+        "MSI": 458.67,
         "BTC": 81500.0,
         "BTCUSD": 81500.0,
         "BTCUSDT": 81500.0,
@@ -187,12 +188,13 @@ class OptionsFeed:
             all_strikes = sorted(list(set(calls.keys()) | set(puts.keys())))
 
             if all_strikes:
-                curr_spot = float(spot_price) if spot_price and spot_price > 0 else (
-                    float(calls[all_strikes[0]].get("strike", 100.0))
-                )
-                quotes = await market_data_client.get_quotes([symbol])
-                if quotes:
-                    curr_spot = float(quotes[0].get("regularMarketPrice", curr_spot))
+                curr_spot = float(spot_price) if spot_price and spot_price > 0 else 0.0
+                if curr_spot <= 0:
+                    quotes = await market_data_client.get_quotes([symbol])
+                    if quotes and quotes[0].get("regularMarketPrice") is not None:
+                        curr_spot = float(quotes[0]["regularMarketPrice"])
+                if curr_spot <= 0:
+                    curr_spot = float(all_strikes[len(all_strikes) // 2])
 
                 # Select 11 strikes around spot price
                 closest_idx = min(range(len(all_strikes)), key=lambda i: abs(all_strikes[i] - curr_spot))
@@ -289,6 +291,14 @@ class OptionsFeed:
             quotes = await market_data_client.get_quotes([symbol])
             if quotes and quotes[0].get("regularMarketPrice") is not None:
                 spot_price = float(quotes[0]["regularMarketPrice"])
+            if spot_price is None or spot_price <= 0:
+                spot_price = cls.DEFAULT_PRICES.get(symbol)
+            if spot_price is None or spot_price <= 0:
+                try:
+                    from app.feeds.equities import equities_feed
+                    spot_price = equities_feed.get_security_price(symbol)
+                except Exception:
+                    pass
 
         return cls.get_options_chain(symbol, spot_price)
 
