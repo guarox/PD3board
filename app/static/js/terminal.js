@@ -753,9 +753,9 @@ class TerminalController {
         </div>
         <div style="flex: 1; border-left: 1px solid #282828; padding-left: 15px;">
           <div style="font-size: 11px; color: var(--text-muted);">12M PRICE TARGET</div>
-          <div style="font-size: 16px; font-weight: bold; color: #fff;">$${anr.target_price.toFixed(2)} <span class="${upsideCls}" style="font-size: 13px;">(${sign}${anr.upside_pct}%)</span></div>
+          <div style="font-size: 16px; font-weight: bold; color: #fff;">$${Number(anr.target_price || 0).toFixed(2)} <span class="${upsideCls}" style="font-size: 13px;">(${sign}${anr.upside_pct || 0}%)</span></div>
           <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-            RANGE: $${anr.target_low.toFixed(2)} - $${anr.target_high.toFixed(2)}
+            RANGE: $${Number(anr.target_low || 0).toFixed(2)} - $${Number(anr.target_high || 0).toFixed(2)}
           </div>
         </div>
       </div>
@@ -844,7 +844,7 @@ class TerminalController {
         <tr style="${isTarget ? 'background: #221800; font-weight: bold;' : ''}">
           <td><strong style="color: ${isTarget ? 'var(--amber-bright)' : '#fff'};">${p.symbol}</strong></td>
           <td>${p.name}</td>
-          <td class="text-right">$${p.price.toFixed(2)}</td>
+          <td class="text-right">$${Number(p.price || 0).toFixed(2)}</td>
           <td class="text-right">${p.pe}</td>
           <td class="text-right">${p.fwd_pe}</td>
           <td class="text-right">${p.ev_ebitda}</td>
@@ -892,36 +892,69 @@ class TerminalController {
     const body = document.getElementById('modalBody');
 
     badge.innerText = 'EE';
-    heading.innerText = `${ee.symbol} - EARNINGS ESTIMATES & SURPRISES`;
+    const isCrypto = ee.asset_type === 'DIGITAL_ASSET';
+    heading.innerText = `${ee.symbol || this.currentTicker} - ${isCrypto ? 'PROTOCOL REVENUE & NETWORK METRICS' : 'EARNINGS ESTIMATES & SURPRISES'}`;
 
     let histHtml = '';
-    ee.quarterly_history.forEach(q => {
-      const cls = q.surprise_pct >= 0 ? 'pos' : 'neg';
-      const sign = q.surprise_pct >= 0 ? '+' : '';
-      histHtml += `
-        <tr>
-          <td><strong>${q.quarter}</strong></td>
-          <td class="text-right">$${q.reported_eps.toFixed(2)}</td>
-          <td class="text-right neu">$${q.consensus_eps.toFixed(2)}</td>
-          <td class="text-right ${cls}"><strong>${sign}${q.surprise_pct.toFixed(2)}%</strong></td>
-          <td class="text-right">$${q.revenue_reported}</td>
-          <td class="text-right ${cls}">${sign}${q.rev_surprise_pct.toFixed(2)}%</td>
-        </tr>
-      `;
-    });
+    const quarterly = ee.quarterly_history || [];
+    if (quarterly.length === 0) {
+      histHtml = '<tr><td colspan="6" class="text-center neu" style="padding: 12px;">NO QUARTERLY SURPRISE HISTORY AVAILABLE</td></tr>';
+    } else {
+      quarterly.forEach(q => {
+        const surp = q.surprise_pct != null ? Number(q.surprise_pct) : 0;
+        const cls = surp >= 0 ? 'pos' : 'neg';
+        const sign = surp >= 0 ? '+' : '';
+        const repEps = q.reported_eps != null ? `$${Number(q.reported_eps).toFixed(2)}` : 'N/A';
+        const conEps = q.consensus_eps != null ? `$${Number(q.consensus_eps).toFixed(2)}` : 'N/A';
+        const surpStr = q.surprise_pct != null ? `${sign}${surp.toFixed(2)}%` : (q.guidance || 'N/A');
+        const revStr = q.revenue_reported ? (String(q.revenue_reported).startsWith('$') ? q.revenue_reported : `$${q.revenue_reported}`) : 'N/A';
+
+        let revSurpStr = 'N/A';
+        let revCls = 'neu';
+        if (q.rev_surprise_pct != null) {
+          const revSurp = Number(q.rev_surprise_pct);
+          revCls = revSurp >= 0 ? 'pos' : 'neg';
+          revSurpStr = `${revSurp >= 0 ? '+' : ''}${revSurp.toFixed(2)}%`;
+        } else if (q.guidance) {
+          revCls = q.guidance === 'BEAT' ? 'pos' : (q.guidance === 'MISS' ? 'neg' : 'neu');
+          revSurpStr = q.guidance;
+        }
+
+        histHtml += `
+          <tr>
+            <td><strong>${q.quarter || 'N/A'}</strong></td>
+            <td class="text-right">${repEps}</td>
+            <td class="text-right neu">${conEps}</td>
+            <td class="text-right ${cls}"><strong>${surpStr}</strong></td>
+            <td class="text-right">${revStr}</td>
+            <td class="text-right ${revCls}">${revSurpStr}</td>
+          </tr>
+        `;
+      });
+    }
 
     let fwdHtml = '';
-    ee.forward_estimates.forEach(f => {
-      fwdHtml += `
-        <tr>
-          <td><strong>${f.quarter}</strong></td>
-          <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">$${f.consensus_eps.toFixed(2)}</td>
-          <td class="text-right neu">$${f.low_eps.toFixed(2)}</td>
-          <td class="text-right neu">$${f.high_eps.toFixed(2)}</td>
-          <td class="text-right">$${f.est_revenue}</td>
-        </tr>
-      `;
-    });
+    const forward = ee.forward_estimates || [];
+    if (forward.length === 0) {
+      fwdHtml = '<tr><td colspan="5" class="text-center neu" style="padding: 12px;">NO FORWARD CONSENSUS GUIDANCE AVAILABLE</td></tr>';
+    } else {
+      forward.forEach(f => {
+        const conEps = f.consensus_eps != null ? `$${Number(f.consensus_eps).toFixed(2)}` : 'N/A';
+        const lowEps = f.low_eps != null ? `$${Number(f.low_eps).toFixed(2)}` : 'N/A';
+        const highEps = f.high_eps != null ? `$${Number(f.high_eps).toFixed(2)}` : 'N/A';
+        const estRev = f.est_revenue ? (String(f.est_revenue).startsWith('$') ? f.est_revenue : `$${f.est_revenue}`) : 'N/A';
+
+        fwdHtml += `
+          <tr>
+            <td><strong>${f.quarter || 'N/A'}</strong></td>
+            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${conEps}</td>
+            <td class="text-right neu">${lowEps}</td>
+            <td class="text-right neu">${highEps}</td>
+            <td class="text-right">${estRev}</td>
+          </tr>
+        `;
+      });
+    }
 
     body.innerHTML = `
       <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">QUARTERLY EPS &amp; REVENUE SURPRISES</div>
