@@ -26,6 +26,7 @@ from app.feeds.options import OptionsFeed
 from app.feeds.market_heatmap import MarketHeatmapFeed
 from app.feeds.insider_holdings import InsiderHoldingsFeed
 from app.feeds.ai_research import AIResearchFeed
+from app.models.contracts import normalize_contract_payload
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("pd3board")
@@ -489,10 +490,12 @@ async def execute_command(req: CommandRequest):
             ]
         }
 
+    normalized_data = normalize_contract_payload(fn, data, ticker)
+
     return {
         "success": True,
         "parsed": parsed,
-        "data": data
+        "data": normalized_data
     }
 
 @app.get("/api/wei")
@@ -513,27 +516,33 @@ async def get_eco():
 
 @app.get("/api/des/{symbol}")
 async def get_des(symbol: str):
-    return await equities_feed.get_security_description_async(symbol)
+    res = await equities_feed.get_security_description_async(symbol)
+    return normalize_contract_payload("DES", res, symbol)
 
 @app.get("/api/anr/{symbol}")
 async def get_anr(symbol: str):
-    return await equities_feed.get_analyst_recommendations_async(symbol)
+    res = await equities_feed.get_analyst_recommendations_async(symbol)
+    return normalize_contract_payload("ANR", res, symbol)
 
 @app.get("/api/fa/{symbol}")
 async def get_fa(symbol: str):
-    return await equities_feed.get_financial_analysis_async(symbol)
+    res = await equities_feed.get_financial_analysis_async(symbol)
+    return normalize_contract_payload("FA", res, symbol)
 
 @app.get("/api/rv/{symbol}")
 async def get_rv(symbol: str):
-    return await equities_feed.get_relative_valuation_async(symbol)
+    res = await equities_feed.get_relative_valuation_async(symbol)
+    return normalize_contract_payload("RV", res, symbol)
 
 @app.get("/api/ee/{symbol}")
 async def get_ee(symbol: str):
-    return await equities_feed.get_earnings_estimates_async(symbol)
+    res = await equities_feed.get_earnings_estimates_async(symbol)
+    return normalize_contract_payload("EE", res, symbol)
 
 @app.get("/api/wirp")
 async def get_wirp():
-    return await world_macro_feed.get_wirp_async()
+    res = await world_macro_feed.get_wirp_async()
+    return normalize_contract_payload("WIRP", res)
 
 @app.get("/api/wcrs")
 async def get_wcrs():
@@ -545,23 +554,28 @@ async def get_fdm():
 
 @app.get("/api/options/{symbol}")
 async def get_options(symbol: str):
-    return await options_feed.get_options_chain_async(symbol)
+    res = await options_feed.get_options_chain_async(symbol)
+    return normalize_contract_payload("OMON", res, symbol)
 
 @app.get("/api/heatmap")
 async def get_heatmap():
-    return await market_heatmap_feed.get_market_heatmap_async()
+    res = await market_heatmap_feed.get_market_heatmap_async()
+    return normalize_contract_payload("MAPS", res)
 
 @app.get("/api/insiders/{symbol}")
 async def get_insiders(symbol: str):
-    return await insider_holdings_feed.get_insider_transactions_async(symbol)
+    res = await insider_holdings_feed.get_insider_transactions_async(symbol)
+    return normalize_contract_payload("INSD", res, symbol)
 
 @app.get("/api/holders/{symbol}")
 async def get_holders(symbol: str):
-    return await insider_holdings_feed.get_institutional_holders_async(symbol)
+    res = await insider_holdings_feed.get_institutional_holders_async(symbol)
+    return normalize_contract_payload("HDS", res, symbol)
 
 @app.get("/api/research/{symbol}")
 async def get_research(symbol: str):
-    return await ai_research_feed.generate_research_memo_async(symbol)
+    res = await ai_research_feed.generate_research_memo_async(symbol)
+    return normalize_contract_payload("AI", res, symbol)
 
 @app.get("/api/help")
 async def get_help():

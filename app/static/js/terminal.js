@@ -551,613 +551,737 @@ class TerminalController {
     });
   }
 
+  fmtNum(val, dec = 2, fallback = 'N/A') {
+    if (val === null || val === undefined || val === '' || isNaN(Number(val))) return fallback;
+    return Number(val).toFixed(dec);
+  }
+
+  fmtCur(val, dec = 2, fallback = 'N/A') {
+    if (val === null || val === undefined || val === '' || isNaN(Number(val))) return fallback;
+    const n = Number(val);
+    const sign = n < 0 ? '-' : '';
+    return `${sign}$${Math.abs(n).toFixed(dec)}`;
+  }
+
+  fmtPct(val, dec = 2, showSign = true, fallback = 'N/A') {
+    if (val === null || val === undefined || val === '' || isNaN(Number(val))) return fallback;
+    const n = Number(val);
+    const sign = (showSign && n > 0) ? '+' : '';
+    return `${sign}${n.toFixed(dec)}%`;
+  }
+
+  showErrorModal(badgeText, title, message) {
+    const modal = document.getElementById('terminalModal');
+    const heading = document.getElementById('modalHeading');
+    const badge = document.getElementById('modalBadge');
+    const body = document.getElementById('modalBody');
+    if (!modal || !heading || !badge || !body) return;
+    badge.innerText = badgeText || 'ERR';
+    heading.innerText = `${this.currentTicker} - ${title || 'DATA FEED ADVISORY'}`;
+    body.innerHTML = `
+      <div style="padding: 24px; text-align: center; border: 1px solid #ff3344; background: #1a0a0a; margin: 15px 0;">
+        <div style="color: #ff3344; font-size: 14px; font-weight: bold; margin-bottom: 8px;">DATA FEED ADVISORY</div>
+        <div style="color: #fff; font-size: 12px; margin-bottom: 12px;">${message || 'Upstream provider did not return valid data for this security.'}</div>
+        <div style="font-size: 11px; color: var(--amber-dim);">TICKER: ${this.currentTicker} | FUNCTION: ${badgeText || 'N/A'}</div>
+      </div>
+      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+      </div>
+    `;
+    modal.classList.remove('hidden');
+  }
+
   async executeFunction(fn, data = null) {
-    if (fn === 'DES') {
-      if (!data) {
-        const res = await fetch(`/api/des/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
+    try {
+      if (fn === 'DES') {
+        if (!data) {
+          const res = await fetch(`/api/des/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showDesModal(data);
+      } else if (fn === 'ANR') {
+        if (!data) {
+          const res = await fetch(`/api/anr/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showAnrModal(data);
+      } else if (fn === 'FA') {
+        if (!data) {
+          const res = await fetch(`/api/fa/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showFaModal(data);
+      } else if (fn === 'RV') {
+        if (!data) {
+          const res = await fetch(`/api/rv/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showRvModal(data);
+      } else if (fn === 'EE') {
+        if (!data) {
+          const res = await fetch(`/api/ee/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showEeModal(data);
+      } else if (fn === 'WIRP') {
+        if (!data) {
+          const res = await fetch('/api/wirp');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showWirpModal(data);
+      } else if (fn === 'WCRS') {
+        if (!data) {
+          const res = await fetch('/api/wcrs');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showWcrsModal(data);
+      } else if (fn === 'FDM') {
+        if (!data) {
+          const res = await fetch('/api/fdm');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showFdmModal(data);
+      } else if (fn === 'OMON') {
+        if (!data) {
+          const res = await fetch(`/api/options/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showOmonModal(data);
+      } else if (fn === 'MAPS') {
+        if (!data) {
+          const res = await fetch('/api/heatmap');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showMapsModal(data);
+      } else if (fn === 'AI') {
+        if (!data) {
+          const res = await fetch(`/api/research/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showAiModal(data);
+      } else if (fn === 'INSD') {
+        if (!data) {
+          const res = await fetch(`/api/insiders/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showInsdModal(data);
+      } else if (fn === 'HDS') {
+        if (!data) {
+          const res = await fetch(`/api/holders/${this.currentTicker}`);
+          data = res.ok ? await res.json() : null;
+        }
+        this.showHdsModal(data);
+      } else if (fn === 'HELP') {
+        if (!data) {
+          const res = await fetch('/api/help');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showHelpModal(data);
+      } else if (fn === 'ECO') {
+        if (!data) {
+          const res = await fetch('/api/eco');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showEcoModal(data);
+      } else {
+        this.closeModal();
       }
-      this.showDesModal(data);
-    } else if (fn === 'ANR') {
-      if (!data) {
-        const res = await fetch(`/api/anr/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showAnrModal(data);
-    } else if (fn === 'FA') {
-      if (!data) {
-        const res = await fetch(`/api/fa/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showFaModal(data);
-    } else if (fn === 'RV') {
-      if (!data) {
-        const res = await fetch(`/api/rv/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showRvModal(data);
-    } else if (fn === 'EE') {
-      if (!data) {
-        const res = await fetch(`/api/ee/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showEeModal(data);
-    } else if (fn === 'WIRP') {
-      if (!data) {
-        const res = await fetch('/api/wirp');
-        data = res.ok ? await res.json() : null;
-      }
-      this.showWirpModal(data);
-    } else if (fn === 'WCRS') {
-      if (!data) {
-        const res = await fetch('/api/wcrs');
-        data = res.ok ? await res.json() : null;
-      }
-      this.showWcrsModal(data);
-    } else if (fn === 'FDM') {
-      if (!data) {
-        const res = await fetch('/api/fdm');
-        data = res.ok ? await res.json() : null;
-      }
-      this.showFdmModal(data);
-    } else if (fn === 'OMON') {
-      if (!data) {
-        const res = await fetch(`/api/options/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showOmonModal(data);
-    } else if (fn === 'MAPS') {
-      if (!data) {
-        const res = await fetch('/api/heatmap');
-        data = res.ok ? await res.json() : null;
-      }
-      this.showMapsModal(data);
-    } else if (fn === 'AI') {
-      if (!data) {
-        const res = await fetch(`/api/research/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showAiModal(data);
-    } else if (fn === 'INSD') {
-      if (!data) {
-        const res = await fetch(`/api/insiders/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showInsdModal(data);
-    } else if (fn === 'HDS') {
-      if (!data) {
-        const res = await fetch(`/api/holders/${this.currentTicker}`);
-        data = res.ok ? await res.json() : null;
-      }
-      this.showHdsModal(data);
-    } else if (fn === 'HELP') {
-      if (!data) {
-        const res = await fetch('/api/help');
-        data = res.ok ? await res.json() : null;
-      }
-      this.showHelpModal(data);
-    } else if (fn === 'ECO') {
-      if (!data) {
-        const res = await fetch('/api/eco');
-        data = res.ok ? await res.json() : null;
-      }
-      this.showEcoModal(data);
-    } else {
-      this.closeModal();
+    } catch (err) {
+      console.error(`Error executing ${fn}:`, err);
+      this.showErrorModal(fn, 'COMMUNICATION ERROR', err.message || 'Failed to retrieve command data');
     }
   }
 
   showDesModal(des) {
-    if (!des) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!des) {
+      this.showErrorModal('DES', 'SECURITY DESCRIPTION', 'No security description data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'DES';
-    heading.innerText = `${des.symbol} ${des.sector} // SECURITY DESCRIPTION & FUNDAMENTALS`;
+      badge.innerText = 'DES';
+      heading.innerText = `${des.symbol || this.currentTicker} ${des.sector || 'EQUITY'} // SECURITY DESCRIPTION & FUNDAMENTALS`;
 
-    const isPos = des.change >= 0;
-    const sign = isPos ? '+' : '';
-    const chgClass = isPos ? 'pos' : 'neg';
+      const numPrice = Number(des.price || 0);
+      const numChg = Number(des.change || 0);
+      const numPct = Number(des.change_pct || 0);
+      const isPos = numChg >= 0;
+      const chgClass = isPos ? 'pos' : 'neg';
 
-    body.innerHTML = `
-      <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border-amber); padding-bottom: 6px;">
-        <div>
-          <span style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${des.name}</span>
-          <span class="neu" style="margin-left: 8px;">[${des.exchange} | ${des.industry}]</span>
-        </div>
-        <div>
-          <span style="font-size: 16px; font-weight: bold; color: #fff;">${Number(des.price).toFixed(2)} USD</span>
-          <span class="${chgClass}" style="margin-left: 6px; font-weight: bold;">${sign}${Number(des.change).toFixed(2)} (${sign}${Number(des.change_pct).toFixed(2)}%)</span>
-        </div>
-      </div>
-
-      <div class="des-grid">
-        <div class="des-card">
-          <div class="des-card-title">VALUATION &amp; CAPITAL STRUCTURE</div>
-          <div class="des-row"><span class="des-label">MARKET CAP</span><span class="des-val">${des.market_cap}</span></div>
-          <div class="des-row"><span class="des-label">SHARES OUT</span><span class="des-val">${des.shares_out}</span></div>
-          <div class="des-row"><span class="des-label">P/E (TTM)</span><span class="des-val">${des.pe}</span></div>
-          <div class="des-row"><span class="des-label">FORWARD P/E</span><span class="des-val">${des.fwd_pe}</span></div>
-          <div class="des-row"><span class="des-label">DILUTED EPS</span><span class="des-val">${des.eps}</span></div>
+      body.innerHTML = `
+        <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border-amber); padding-bottom: 6px;">
+          <div>
+            <span style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${des.name || des.symbol || this.currentTicker}</span>
+            <span class="neu" style="margin-left: 8px;">[${des.exchange || 'US'} | ${des.industry || 'General'}]</span>
+          </div>
+          <div>
+            <span style="font-size: 16px; font-weight: bold; color: #fff;">${this.fmtNum(numPrice, 2)} USD</span>
+            <span class="${chgClass}" style="margin-left: 6px; font-weight: bold;">${this.fmtCur(numChg, 2)} (${this.fmtPct(numPct, 2)})</span>
+          </div>
         </div>
 
-        <div class="des-card">
-          <div class="des-card-title">PRICE PERFORMANCE &amp; RISK</div>
-          <div class="des-row"><span class="des-label">52-WEEK RANGE</span><span class="des-val">${des.range_52w}</span></div>
-          <div class="des-row"><span class="des-label">BETA (5Y MONTHLY)</span><span class="des-val">${des.beta}</span></div>
-          <div class="des-row"><span class="des-label">DIVIDEND YIELD</span><span class="des-val">${des.div_yield}</span></div>
-          <div class="des-row"><span class="des-label">EX-DIVIDEND DATE</span><span class="des-val">${des.ex_div_date}</span></div>
-          <div class="des-row"><span class="des-label">CURRENCY</span><span class="des-val">${des.currency}</span></div>
-        </div>
+        <div class="des-grid">
+          <div class="des-card">
+            <div class="des-card-title">VALUATION &amp; CAPITAL STRUCTURE</div>
+            <div class="des-row"><span class="des-label">MARKET CAP</span><span class="des-val">${des.market_cap || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">SHARES OUT</span><span class="des-val">${des.shares_out || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">P/E (TTM)</span><span class="des-val">${des.pe || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">FORWARD P/E</span><span class="des-val">${des.fwd_pe || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">DILUTED EPS</span><span class="des-val">${des.eps || 'N/A'}</span></div>
+          </div>
 
-        <div class="des-card">
-          <div class="des-card-title">FINANCIAL PROFILE (TTM)</div>
-          <div class="des-row"><span class="des-label">REVENUE</span><span class="des-val">${des.revenue}</span></div>
-          <div class="des-row"><span class="des-label">NET INCOME</span><span class="des-val">${des.net_income}</span></div>
-          <div class="des-row"><span class="des-label">PRIMARY EXCHANGE</span><span class="des-val">${des.exchange}</span></div>
-        </div>
+          <div class="des-card">
+            <div class="des-card-title">PRICE PERFORMANCE &amp; RISK</div>
+            <div class="des-row"><span class="des-label">52-WEEK RANGE</span><span class="des-val">${des.range_52w || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">BETA (5Y MONTHLY)</span><span class="des-val">${des.beta || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">DIVIDEND YIELD</span><span class="des-val">${des.dividend_yield || des.div_yield || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">EX-DIVIDEND DATE</span><span class="des-val">${des.ex_div_date || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">CURRENCY</span><span class="des-val">${des.currency || 'USD'}</span></div>
+          </div>
 
-        <div class="des-card">
-          <div class="des-card-title">CORPORATE GOVERNANCE</div>
-          <div class="des-row"><span class="des-label">EXECUTIVE LEADERSHIP</span><span class="des-val">${des.ceo}</span></div>
-          <div class="des-row"><span class="des-label">GLOBAL HEADQUARTERS</span><span class="des-val">${des.hq}</span></div>
-          <div class="des-row"><span class="des-label">SECTOR CLASSIFICATION</span><span class="des-val">${des.sector}</span></div>
+          <div class="des-card">
+            <div class="des-card-title">FINANCIAL PROFILE (TTM)</div>
+            <div class="des-row"><span class="des-label">REVENUE</span><span class="des-val">${des.revenue || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">NET INCOME</span><span class="des-val">${des.net_income || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">PRIMARY EXCHANGE</span><span class="des-val">${des.exchange || 'US'}</span></div>
+          </div>
+
+          <div class="des-card">
+            <div class="des-card-title">CORPORATE GOVERNANCE</div>
+            <div class="des-row"><span class="des-label">EXECUTIVE LEADERSHIP</span><span class="des-val">${des.ceo || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">GLOBAL HEADQUARTERS</span><span class="des-val">${des.hq || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">SECTOR CLASSIFICATION</span><span class="des-val">${des.sector || 'EQUITY'}</span></div>
+          </div>
         </div>
-      </div>
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering DES modal:', err);
+      this.showErrorModal('DES', 'SECURITY DESCRIPTION ERROR', err.message);
+    }
   }
 
   showAnrModal(anr) {
-    if (!anr) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!anr) {
+      this.showErrorModal('ANR', 'ANALYST RECOMMENDATIONS', 'No analyst recommendation data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'ANR';
-    heading.innerText = `${anr.symbol} - ANALYST RECOMMENDATIONS & TARGETS`;
+      badge.innerText = 'ANR';
+      heading.innerText = `${anr.symbol || this.currentTicker} - ANALYST RECOMMENDATIONS & TARGETS`;
 
-    let brokersHtml = '';
-    anr.brokers.forEach(b => {
-      const ratingCls = b.rating.includes('BUY') || b.rating.includes('OVERWEIGHT') ? 'pos' : (b.rating.includes('UNDER') || b.rating.includes('SELL') ? 'neg' : 'neu');
-      brokersHtml += `
-        <tr>
-          <td><strong>${b.firm}</strong></td>
-          <td>${b.analyst}</td>
-          <td class="${ratingCls}"><strong>${b.rating}</strong></td>
-          <td class="text-right"><strong>$${b.target.toFixed(2)}</strong></td>
-          <td class="text-right neu">${b.date}</td>
-        </tr>
-      `;
-    });
-
-    const upsideCls = anr.upside_pct >= 0 ? 'pos' : 'neg';
-    const sign = anr.upside_pct >= 0 ? '+' : '';
-
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
-        <div style="flex: 1;">
-          <div style="font-size: 11px; color: var(--text-muted);">CONSENSUS RATING</div>
-          <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${anr.consensus} (${anr.consensus_score} / 5.0)</div>
-          <div style="font-size: 11px; margin-top: 4px;">
-            <span class="pos">${anr.buys} BUYS</span> &bull; 
-            <span class="neu">${anr.holds} HOLDS</span> &bull; 
-            <span class="neg">${anr.sells} SELLS</span> (${anr.total_analysts} TOTAL)
-          </div>
-        </div>
-        <div style="flex: 1; border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">12M PRICE TARGET</div>
-          <div style="font-size: 16px; font-weight: bold; color: #fff;">$${Number(anr.target_price || 0).toFixed(2)} <span class="${upsideCls}" style="font-size: 13px;">(${sign}${anr.upside_pct || 0}%)</span></div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
-            RANGE: $${Number(anr.target_low || 0).toFixed(2)} - $${Number(anr.target_high || 0).toFixed(2)}
-          </div>
-        </div>
-      </div>
-
-      <div style="margin-bottom: 8px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">WALL STREET BROKER COVERAGE</div>
-      <table class="modal-table">
-        <thead>
+      let brokersHtml = '';
+      (anr.brokers || []).forEach(b => {
+        const rating = b.rating || 'HOLD';
+        const ratingCls = rating.includes('BUY') || rating.includes('OVERWEIGHT') ? 'pos' : (rating.includes('UNDER') || rating.includes('SELL') ? 'neg' : 'neu');
+        brokersHtml += `
           <tr>
-            <th>BROKER FIRM</th>
-            <th>LEAD ANALYST</th>
-            <th>RECOMMENDATION</th>
-            <th class="text-right">PRICE TARGET</th>
-            <th class="text-right">DATE</th>
+            <td><strong>${b.firm || 'Wall Street'}</strong></td>
+            <td>${b.analyst || 'Analyst'}</td>
+            <td class="${ratingCls}"><strong>${rating}</strong></td>
+            <td class="text-right"><strong>${this.fmtCur(b.target, 2)}</strong></td>
+            <td class="text-right neu">${b.date || '2026'}</td>
           </tr>
-        </thead>
-        <tbody>${brokersHtml}</tbody>
-      </table>
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+        `;
+      });
+
+      const upside = Number(anr.upside_pct || 0);
+      const upsideCls = upside >= 0 ? 'pos' : 'neg';
+
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div style="flex: 1;">
+            <div style="font-size: 11px; color: var(--text-muted);">CONSENSUS RATING</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${anr.consensus || 'HOLD'} (${this.fmtNum(anr.consensus_score, 1)} / 5.0)</div>
+            <div style="font-size: 11px; margin-top: 4px;">
+              <span class="pos">${anr.buys || 0} BUYS</span> &bull; 
+              <span class="neu">${anr.holds || 0} HOLDS</span> &bull; 
+              <span class="neg">${anr.sells || 0} SELLS</span> (${anr.total_analysts || 0} TOTAL)
+            </div>
+          </div>
+          <div style="flex: 1; border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">12M PRICE TARGET</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">${this.fmtCur(anr.target_price, 2)} <span class="${upsideCls}" style="font-size: 13px;">(${this.fmtPct(upside, 2)})</span></div>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              RANGE: ${this.fmtCur(anr.target_low, 2)} - ${this.fmtCur(anr.target_high, 2)}
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 8px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">WALL STREET BROKER COVERAGE</div>
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>BROKER FIRM</th>
+              <th>LEAD ANALYST</th>
+              <th>RECOMMENDATION</th>
+              <th class="text-right">PRICE TARGET</th>
+              <th class="text-right">DATE</th>
+            </tr>
+          </thead>
+          <tbody>${brokersHtml || '<tr><td colspan="5" class="neu text-center">No active broker coverage found</td></tr>'}</tbody>
+        </table>
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering ANR modal:', err);
+      this.showErrorModal('ANR', 'ANALYST RECOMMENDATIONS ERROR', err.message);
+    }
   }
 
   showFaModal(fa) {
-    if (!fa) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!fa) {
+      this.showErrorModal('FA', 'FINANCIAL ANALYSIS', 'No financial analysis data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'FA';
-    heading.innerText = `${fa.symbol} - FINANCIAL ANALYSIS (5-YEAR HISTORICAL)`;
+      badge.innerText = 'FA';
+      heading.innerText = `${fa.symbol || this.currentTicker} - FINANCIAL ANALYSIS (5-YEAR HISTORICAL)`;
 
-    const yearsHead = fa.years.map(y => `<th class="text-right">${y}</th>`).join('');
+      const years = fa.years || fa.periods || ['2021', '2022', '2023', '2024', '2025'];
+      const yearsHead = years.map(y => `<th class="text-right">${y}</th>`).join('');
 
-    const renderRows = (items) => {
-      return items.map(item => `
-        <tr>
-          <td>${item.metric}</td>
-          ${item.vals.map(v => `<td class="text-right"><strong>${v}</strong></td>`).join('')}
-        </tr>
-      `).join('');
-    };
+      const renderRows = (items) => {
+        if (!items) return '';
+        let list = [];
+        if (Array.isArray(items)) {
+          list = items;
+        } else if (typeof items === 'object') {
+          list = Object.entries(items).map(([metric, vals]) => ({
+            metric,
+            vals: Array.isArray(vals) ? vals : [vals]
+          }));
+        }
+        return list.map(item => `
+          <tr>
+            <td>${item.metric || 'Metric'}</td>
+            ${(item.vals || []).map(v => `<td class="text-right"><strong>${v != null ? v : 'N/A'}</strong></td>`).join('')}
+          </tr>
+        `).join('');
+      };
 
-    body.innerHTML = `
-      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">INCOME STATEMENT</div>
-      <table class="modal-table" style="margin-bottom: 12px;">
-        <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
-        <tbody>${renderRows(fa.income_statement)}</tbody>
-      </table>
+      body.innerHTML = `
+        <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">INCOME STATEMENT</div>
+        <table class="modal-table" style="margin-bottom: 12px;">
+          <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
+          <tbody>${renderRows(fa.income_statement) || '<tr><td colspan="6" class="neu text-center">No income statement data</td></tr>'}</tbody>
+        </table>
 
-      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">BALANCE SHEET &amp; LIQUIDITY</div>
-      <table class="modal-table" style="margin-bottom: 12px;">
-        <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
-        <tbody>${renderRows(fa.balance_sheet)}</tbody>
-      </table>
+        <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">BALANCE SHEET &amp; LIQUIDITY</div>
+        <table class="modal-table" style="margin-bottom: 12px;">
+          <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
+          <tbody>${renderRows(fa.balance_sheet) || '<tr><td colspan="6" class="neu text-center">No balance sheet data</td></tr>'}</tbody>
+        </table>
 
-      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">CASH FLOW STATEMENT</div>
-      <table class="modal-table">
-        <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
-        <tbody>${renderRows(fa.cash_flow)}</tbody>
-      </table>
+        <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">CASH FLOW STATEMENT</div>
+        <table class="modal-table">
+          <thead><tr><th>METRIC (USD)</th>${yearsHead}</tr></thead>
+          <tbody>${renderRows(fa.cash_flow) || '<tr><td colspan="6" class="neu text-center">No cash flow data</td></tr>'}</tbody>
+        </table>
 
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering FA modal:', err);
+      this.showErrorModal('FA', 'FINANCIAL ANALYSIS ERROR', err.message);
+    }
   }
 
   showRvModal(rv) {
-    if (!rv) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!rv) {
+      this.showErrorModal('RV', 'RELATIVE VALUATION', 'No peer valuation data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'RV';
-    heading.innerText = `${rv.symbol} - RELATIVE VALUATION & PEER COMP MATRIX`;
+      badge.innerText = 'RV';
+      heading.innerText = `${rv.symbol || this.currentTicker} - RELATIVE VALUATION & PEER COMP MATRIX`;
 
-    let rowsHtml = '';
-    rv.peers.forEach(p => {
-      const isTarget = p.symbol === rv.symbol;
-      rowsHtml += `
-        <tr style="${isTarget ? 'background: #221800; font-weight: bold;' : ''}">
-          <td><strong style="color: ${isTarget ? 'var(--amber-bright)' : '#fff'};">${p.symbol}</strong></td>
-          <td>${p.name}</td>
-          <td class="text-right">$${Number(p.price || 0).toFixed(2)}</td>
-          <td class="text-right">${p.pe}</td>
-          <td class="text-right">${p.fwd_pe}</td>
-          <td class="text-right">${p.ev_ebitda}</td>
-          <td class="text-right">${p.ps}</td>
-          <td class="text-right">${p.op_margin}</td>
-          <td class="text-right">${p.roe}</td>
-          <td class="text-right">${p.div_yield}</td>
-        </tr>
-      `;
-    });
-
-    body.innerHTML = `
-      <div style="margin-bottom: 10px; color: var(--text-muted); font-size: 11px;">
-        INDUSTRY GROUP: <strong style="color: var(--amber-bright);">${rv.industry}</strong>
-      </div>
-      <table class="modal-table">
-        <thead>
-          <tr>
-            <th>TICKER</th>
-            <th>SECURITY NAME</th>
-            <th class="text-right">PRICE</th>
-            <th class="text-right">P/E</th>
-            <th class="text-right">FWD P/E</th>
-            <th class="text-right">EV/EBITDA</th>
-            <th class="text-right">P/S</th>
-            <th class="text-right">OP MARG</th>
-            <th class="text-right">ROE</th>
-            <th class="text-right">DIV YLD</th>
+      let rowsHtml = '';
+      (rv.peers || []).forEach(p => {
+        const isTarget = p.symbol === (rv.symbol || this.currentTicker);
+        rowsHtml += `
+          <tr style="${isTarget ? 'background: #221800; font-weight: bold;' : ''}">
+            <td><strong style="color: ${isTarget ? 'var(--amber-bright)' : '#fff'};">${p.symbol || 'N/A'}</strong></td>
+            <td>${p.name || 'Peer'}</td>
+            <td class="text-right">${this.fmtCur(p.price, 2)}</td>
+            <td class="text-right">${p.pe != null ? p.pe : 'N/A'}</td>
+            <td class="text-right">${p.fwd_pe != null ? p.fwd_pe : 'N/A'}</td>
+            <td class="text-right">${p.ev_ebitda != null ? p.ev_ebitda : 'N/A'}</td>
+            <td class="text-right">${p.ps != null ? p.ps : 'N/A'}</td>
+            <td class="text-right">${p.op_margin != null ? p.op_margin : 'N/A'}</td>
+            <td class="text-right">${p.roe != null ? p.roe : 'N/A'}</td>
+            <td class="text-right">${p.div_yield != null ? p.div_yield : 'N/A'}</td>
           </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+        `;
+      });
+
+      body.innerHTML = `
+        <div style="margin-bottom: 8px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">
+          GICS INDUSTRY PEER COMPARISON MATRIX [${rv.industry || 'General'}]
+        </div>
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>TICKER</th>
+              <th>COMPANY NAME</th>
+              <th class="text-right">PRICE</th>
+              <th class="text-right">P/E</th>
+              <th class="text-right">FWD P/E</th>
+              <th class="text-right">EV/EBITDA</th>
+              <th class="text-right">P/S</th>
+              <th class="text-right">OP MARGIN</th>
+              <th class="text-right">ROE</th>
+              <th class="text-right">DIV YIELD</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml || '<tr><td colspan="10" class="neu text-center">No peers available</td></tr>'}</tbody>
+        </table>
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering RV modal:', err);
+      this.showErrorModal('RV', 'RELATIVE VALUATION ERROR', err.message);
+    }
   }
 
   showEeModal(ee) {
-    if (!ee) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
-
-    badge.innerText = 'EE';
-    const isCrypto = ee.asset_type === 'DIGITAL_ASSET';
-    heading.innerText = `${ee.symbol || this.currentTicker} - ${isCrypto ? 'PROTOCOL REVENUE & NETWORK METRICS' : 'EARNINGS ESTIMATES & SURPRISES'}`;
-
-    let histHtml = '';
-    const quarterly = ee.quarterly_history || [];
-    if (quarterly.length === 0) {
-      histHtml = '<tr><td colspan="6" class="text-center neu" style="padding: 12px;">NO QUARTERLY SURPRISE HISTORY AVAILABLE</td></tr>';
-    } else {
-      quarterly.forEach(q => {
-        const surp = q.surprise_pct != null ? Number(q.surprise_pct) : 0;
-        const cls = surp >= 0 ? 'pos' : 'neg';
-        const sign = surp >= 0 ? '+' : '';
-        const repEps = q.reported_eps != null ? `$${Number(q.reported_eps).toFixed(2)}` : 'N/A';
-        const conEps = q.consensus_eps != null ? `$${Number(q.consensus_eps).toFixed(2)}` : 'N/A';
-        const surpStr = q.surprise_pct != null ? `${sign}${surp.toFixed(2)}%` : (q.guidance || 'N/A');
-        const revStr = q.revenue_reported ? (String(q.revenue_reported).startsWith('$') ? q.revenue_reported : `$${q.revenue_reported}`) : 'N/A';
-
-        let revSurpStr = 'N/A';
-        let revCls = 'neu';
-        if (q.rev_surprise_pct != null) {
-          const revSurp = Number(q.rev_surprise_pct);
-          revCls = revSurp >= 0 ? 'pos' : 'neg';
-          revSurpStr = `${revSurp >= 0 ? '+' : ''}${revSurp.toFixed(2)}%`;
-        } else if (q.guidance) {
-          revCls = q.guidance === 'BEAT' ? 'pos' : (q.guidance === 'MISS' ? 'neg' : 'neu');
-          revSurpStr = q.guidance;
-        }
-
-        histHtml += `
-          <tr>
-            <td><strong>${q.quarter || 'N/A'}</strong></td>
-            <td class="text-right">${repEps}</td>
-            <td class="text-right neu">${conEps}</td>
-            <td class="text-right ${cls}"><strong>${surpStr}</strong></td>
-            <td class="text-right">${revStr}</td>
-            <td class="text-right ${revCls}">${revSurpStr}</td>
-          </tr>
-        `;
-      });
+    if (!ee) {
+      this.showErrorModal('EE', 'EARNINGS ESTIMATES', 'No earnings estimate data returned.');
+      return;
     }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    let fwdHtml = '';
-    const forward = ee.forward_estimates || [];
-    if (forward.length === 0) {
-      fwdHtml = '<tr><td colspan="5" class="text-center neu" style="padding: 12px;">NO FORWARD CONSENSUS GUIDANCE AVAILABLE</td></tr>';
-    } else {
-      forward.forEach(f => {
-        const conEps = f.consensus_eps != null ? `$${Number(f.consensus_eps).toFixed(2)}` : 'N/A';
-        const lowEps = f.low_eps != null ? `$${Number(f.low_eps).toFixed(2)}` : 'N/A';
-        const highEps = f.high_eps != null ? `$${Number(f.high_eps).toFixed(2)}` : 'N/A';
-        const estRev = f.est_revenue ? (String(f.est_revenue).startsWith('$') ? f.est_revenue : `$${f.est_revenue}`) : 'N/A';
+      badge.innerText = 'EE';
+      const isCrypto = ee.asset_type === 'DIGITAL_ASSET';
+      heading.innerText = `${ee.symbol || this.currentTicker} - ${isCrypto ? 'PROTOCOL REVENUE & NETWORK METRICS' : 'EARNINGS ESTIMATES & SURPRISES'}`;
 
-        fwdHtml += `
-          <tr>
-            <td><strong>${f.quarter || 'N/A'}</strong></td>
-            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${conEps}</td>
-            <td class="text-right neu">${lowEps}</td>
-            <td class="text-right neu">${highEps}</td>
-            <td class="text-right">${estRev}</td>
-          </tr>
-        `;
-      });
+      let histHtml = '';
+      const quarterly = ee.quarterly_history || [];
+      if (quarterly.length === 0) {
+        histHtml = '<tr><td colspan="6" class="text-center neu" style="padding: 12px;">NO QUARTERLY SURPRISE HISTORY AVAILABLE</td></tr>';
+      } else {
+        quarterly.forEach(q => {
+          const surp = q.surprise_pct != null ? Number(q.surprise_pct) : 0;
+          const cls = surp >= 0 ? 'pos' : 'neg';
+          const repEps = q.reported_eps != null ? this.fmtCur(q.reported_eps, 2) : 'N/A';
+          const conEps = q.consensus_eps != null ? this.fmtCur(q.consensus_eps, 2) : 'N/A';
+          const surpStr = q.surprise_pct != null ? this.fmtPct(surp, 2) : (q.guidance || 'N/A');
+          const revStr = q.revenue_reported ? (String(q.revenue_reported).startsWith('$') ? q.revenue_reported : `$${q.revenue_reported}`) : 'N/A';
+
+          let revSurpStr = 'N/A';
+          let revCls = 'neu';
+          if (q.rev_surprise_pct != null) {
+            const revSurp = Number(q.rev_surprise_pct);
+            revCls = revSurp >= 0 ? 'pos' : 'neg';
+            revSurpStr = this.fmtPct(revSurp, 2);
+          } else if (q.guidance) {
+            revCls = q.guidance === 'BEAT' ? 'pos' : (q.guidance === 'MISS' ? 'neg' : 'neu');
+            revSurpStr = q.guidance;
+          }
+
+          histHtml += `
+            <tr>
+              <td><strong>${q.quarter || 'N/A'}</strong></td>
+              <td class="text-right">${repEps}</td>
+              <td class="text-right neu">${conEps}</td>
+              <td class="text-right ${cls}"><strong>${surpStr}</strong></td>
+              <td class="text-right">${revStr}</td>
+              <td class="text-right ${revCls}">${revSurpStr}</td>
+            </tr>
+          `;
+        });
+      }
+
+      let fwdHtml = '';
+      const forward = ee.forward_estimates || [];
+      if (forward.length === 0) {
+        fwdHtml = '<tr><td colspan="5" class="text-center neu" style="padding: 12px;">NO FORWARD CONSENSUS GUIDANCE AVAILABLE</td></tr>';
+      } else {
+        forward.forEach(f => {
+          const conEps = f.consensus_eps != null ? this.fmtCur(f.consensus_eps, 2) : 'N/A';
+          const lowEps = f.low_eps != null ? this.fmtCur(f.low_eps, 2) : 'N/A';
+          const highEps = f.high_eps != null ? this.fmtCur(f.high_eps, 2) : 'N/A';
+          const estRev = f.est_revenue ? (String(f.est_revenue).startsWith('$') ? f.est_revenue : `$${f.est_revenue}`) : 'N/A';
+
+          fwdHtml += `
+            <tr>
+              <td><strong>${f.quarter || 'N/A'}</strong></td>
+              <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${conEps}</td>
+              <td class="text-right neu">${lowEps}</td>
+              <td class="text-right neu">${highEps}</td>
+              <td class="text-right">${estRev}</td>
+            </tr>
+          `;
+        });
+      }
+
+      body.innerHTML = `
+        <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">QUARTERLY EPS &amp; REVENUE SURPRISES</div>
+        <table class="modal-table" style="margin-bottom: 14px;">
+          <thead>
+            <tr>
+              <th>QUARTER</th>
+              <th class="text-right">REPORTED EPS</th>
+              <th class="text-right">CONSENSUS</th>
+              <th class="text-right">EPS SURPRISE</th>
+              <th class="text-right">REVENUE</th>
+              <th class="text-right">REV SURPRISE</th>
+            </tr>
+          </thead>
+          <tbody>${histHtml}</tbody>
+        </table>
+
+        <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">FORWARD CONSENSUS GUIDANCE</div>
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>QUARTER</th>
+              <th class="text-right">CONSENSUS EPS</th>
+              <th class="text-right">LOW ESTIMATE</th>
+              <th class="text-right">HIGH ESTIMATE</th>
+              <th class="text-right">EST. REVENUE</th>
+            </tr>
+          </thead>
+          <tbody>${fwdHtml}</tbody>
+        </table>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering EE modal:', err);
+      this.showErrorModal('EE', 'EARNINGS ESTIMATES ERROR', err.message);
     }
-
-    body.innerHTML = `
-      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">QUARTERLY EPS &amp; REVENUE SURPRISES</div>
-      <table class="modal-table" style="margin-bottom: 14px;">
-        <thead>
-          <tr>
-            <th>QUARTER</th>
-            <th class="text-right">REPORTED EPS</th>
-            <th class="text-right">CONSENSUS</th>
-            <th class="text-right">EPS SURPRISE</th>
-            <th class="text-right">REVENUE</th>
-            <th class="text-right">REV SURPRISE</th>
-          </tr>
-        </thead>
-        <tbody>${histHtml}</tbody>
-      </table>
-
-      <div style="margin-bottom: 6px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">FORWARD CONSENSUS GUIDANCE</div>
-      <table class="modal-table">
-        <thead>
-          <tr>
-            <th>QUARTER</th>
-            <th class="text-right">CONSENSUS EPS</th>
-            <th class="text-right">LOW ESTIMATE</th>
-            <th class="text-right">HIGH ESTIMATE</th>
-            <th class="text-right">EST. REVENUE</th>
-          </tr>
-        </thead>
-        <tbody>${fwdHtml}</tbody>
-      </table>
-
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
   }
 
   showWirpModal(wirp) {
-    if (!wirp) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!wirp) {
+      this.showErrorModal('WIRP', 'INTEREST RATE PROBABILITIES', 'No rate probability data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'WIRP';
-    heading.innerText = 'WORLD INTEREST RATE PROBABILITIES - FOMC RATE MONITOR';
+      badge.innerText = 'WIRP';
+      heading.innerText = 'WORLD INTEREST RATE PROBABILITIES - FOMC RATE MONITOR';
 
-    let meetHtml = '';
-    wirp.meetings.forEach(m => {
-      meetHtml += `
-        <tr>
-          <td><strong>${m.date}</strong></td>
-          <td class="text-right">${m.days_forward}d</td>
-          <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${m.implied_rate}</td>
-          <td class="text-right pos">${m.prob_cut_25bp}%</td>
-          <td class="text-right pos">${m.prob_cut_50bp}%</td>
-          <td class="text-right neu">${m.prob_hold}%</td>
-          <td class="text-right" style="color: #00e5ff;">${m.bias}</td>
-        </tr>
-      `;
-    });
-
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
-        <div>
-          <div style="font-size: 11px; color: var(--text-muted);">CURRENT TARGET RATE</div>
-          <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${wirp.current_target_rate}</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">EFFECTIVE FED FUNDS (EFFR)</div>
-          <div style="font-size: 16px; font-weight: bold; color: #fff;">${wirp.effective_fed_funds_rate}</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">TERMINAL RATE PROJECTION</div>
-          <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${wirp.terminal_rate}</div>
-        </div>
-      </div>
-
-      <table class="modal-table">
-        <thead>
+      let meetHtml = '';
+      (wirp.meetings || []).forEach(m => {
+        meetHtml += `
           <tr>
-            <th>MEETING DATE</th>
-            <th class="text-right">DAYS</th>
-            <th class="text-right">IMPLIED RATE</th>
-            <th class="text-right">% 25BP CUT</th>
-            <th class="text-right">% 50BP CUT</th>
-            <th class="text-right">% HOLD</th>
-            <th class="text-right">MARKET BIAS</th>
+            <td><strong>${m.date || m.meeting_date || 'N/A'}</strong></td>
+            <td class="text-right">${m.days_forward != null ? `${m.days_forward}d` : '--'}</td>
+            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${m.implied_rate || 'N/A'}</td>
+            <td class="text-right pos">${this.fmtPct(m.prob_cut_25bp != null ? m.prob_cut_25bp : m.cut_prob_pct, 1, false)}</td>
+            <td class="text-right pos">${this.fmtPct(m.prob_cut_50bp != null ? m.prob_cut_50bp : 0, 1, false)}</td>
+            <td class="text-right neu">${this.fmtPct(m.prob_hold != null ? m.prob_hold : m.hold_prob_pct, 1, false)}</td>
+            <td class="text-right" style="color: #00e5ff;">${m.bias || 'NEUTRAL'}</td>
           </tr>
-        </thead>
-        <tbody>${meetHtml}</tbody>
-      </table>
+        `;
+      });
 
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">CURRENT TARGET RATE</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${wirp.current_target_rate || '4.75% - 5.00%'}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">EFFECTIVE FED FUNDS (EFFR)</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">${wirp.effective_fed_funds_rate || '4.83%'}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">TERMINAL RATE PROJECTION</div>
+            <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${wirp.terminal_rate || '3.50% - 3.75%'}</div>
+          </div>
+        </div>
+
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>MEETING DATE</th>
+              <th class="text-right">DAYS</th>
+              <th class="text-right">IMPLIED RATE</th>
+              <th class="text-right">% 25BP CUT</th>
+              <th class="text-right">% 50BP CUT</th>
+              <th class="text-right">% HOLD</th>
+              <th class="text-right">MARKET BIAS</th>
+            </tr>
+          </thead>
+          <tbody>${meetHtml || '<tr><td colspan="7" class="neu text-center">No FOMC meetings data available</td></tr>'}</tbody>
+        </table>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering WIRP modal:', err);
+      this.showErrorModal('WIRP', 'RATE PROBABILITIES ERROR', err.message);
+    }
   }
 
   showWcrsModal(wcrs) {
-    if (!wcrs) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!wcrs) {
+      this.showErrorModal('WCRS', 'WORLD CURRENCY RANKER', 'No currency data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'WCRS';
-    heading.innerText = 'WORLD CURRENCY RANKER - GLOBAL FX PERFORMANCE VS USD';
+      badge.innerText = 'WCRS';
+      heading.innerText = 'WORLD CURRENCY RANKER - GLOBAL FX PERFORMANCE VS USD';
 
-    const currencies = wcrs.currencies || (Array.isArray(wcrs) ? wcrs : []);
-    let rowsHtml = '';
-    currencies.forEach((c, idx) => {
-      const cls = c.change_pct >= 0 ? 'pos' : 'neg';
-      const sign = c.change_pct >= 0 ? '+' : '';
-      rowsHtml += `
-        <tr>
-          <td><strong>#${idx + 1}</strong></td>
-          <td><strong style="color: var(--amber-bright);">${c.code}</strong></td>
-          <td>${c.name}</td>
-          <td class="text-right"><strong>${c.spot.toFixed(4)}</strong></td>
-          <td class="text-right ${cls}">${sign}${c.change.toFixed(4)}</td>
-          <td class="text-right ${cls}"><strong>${sign}${c.change_pct.toFixed(2)}%</strong></td>
-          <td class="text-right neu">${c.range_52w}</td>
-          <td class="text-right" style="color: #00e5ff;">${c.bias}</td>
-        </tr>
-      `;
-    });
-
-    body.innerHTML = `
-      <table class="modal-table">
-        <thead>
+      const currencies = wcrs.currencies || (Array.isArray(wcrs) ? wcrs : []);
+      let rowsHtml = '';
+      currencies.forEach((c, idx) => {
+        const numChg = Number(c.change || 0);
+        const numPct = Number(c.change_pct || 0);
+        const cls = numPct >= 0 ? 'pos' : 'neg';
+        rowsHtml += `
           <tr>
-            <th>RANK</th>
-            <th>CURRENCY</th>
-            <th>NAME</th>
-            <th class="text-right">SPOT RATE</th>
-            <th class="text-right">NET CHANGE</th>
-            <th class="text-right">% CHANGE</th>
-            <th class="text-right">52-WEEK RANGE</th>
-            <th class="text-right">MARKET BIAS</th>
+            <td><strong>#${idx + 1}</strong></td>
+            <td><strong style="color: var(--amber-bright);">${c.pair || c.code || 'FX'}</strong></td>
+            <td>${c.name || 'Currency'}</td>
+            <td class="text-right"><strong>${this.fmtNum(c.spot, 4)}</strong></td>
+            <td class="text-right ${cls}">${this.fmtNum(numChg, 4)}</td>
+            <td class="text-right ${cls}"><strong>${this.fmtPct(numPct, 2)}</strong></td>
+            <td class="text-right neu">${c.range_52w || 'N/A'}</td>
+            <td class="text-right" style="color: #00e5ff;">${c.bias || 'NEUTRAL'}</td>
           </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+        `;
+      });
 
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      body.innerHTML = `
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>RANK</th>
+              <th>CURRENCY</th>
+              <th>NAME</th>
+              <th class="text-right">SPOT RATE</th>
+              <th class="text-right">NET CHANGE</th>
+              <th class="text-right">% CHANGE</th>
+              <th class="text-right">52-WEEK RANGE</th>
+              <th class="text-right">MARKET BIAS</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml || '<tr><td colspan="8" class="neu text-center">No FX rates available</td></tr>'}</tbody>
+        </table>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering WCRS modal:', err);
+      this.showErrorModal('WCRS', 'CURRENCY RANKER ERROR', err.message);
+    }
   }
 
   showFdmModal(fdm) {
-    if (!fdm) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!fdm) {
+      this.showErrorModal('FDM', 'COMMODITIES & FUTURES', 'No commodities data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'FDM';
-    heading.innerText = 'GLOBAL COMMODITIES & FUTURES MONITOR';
+      badge.innerText = 'FDM';
+      heading.innerText = 'GLOBAL COMMODITIES & FUTURES MONITOR';
 
-    const commodities = fdm.commodities || (Array.isArray(fdm) ? fdm : []);
-    let rowsHtml = '';
-    commodities.forEach(c => {
-      const cls = c.change_pct >= 0 ? 'pos' : 'neg';
-      const sign = c.change_pct >= 0 ? '+' : '';
-      rowsHtml += `
-        <tr>
-          <td><strong style="color: var(--amber-bright);">${c.symbol}</strong></td>
-          <td>${c.name}</td>
-          <td><span class="badge" style="font-size: 9px;">${c.category}</span></td>
-          <td class="text-right"><strong>${c.price.toFixed(2)}</strong></td>
-          <td class="text-right ${cls}">${sign}${c.change.toFixed(2)}</td>
-          <td class="text-right ${cls}"><strong>${sign}${c.change_pct.toFixed(2)}%</strong></td>
-          <td class="text-right neu">${c.unit}</td>
-        </tr>
-      `;
-    });
-
-    body.innerHTML = `
-      <table class="modal-table">
-        <thead>
+      const commodities = fdm.commodities || (Array.isArray(fdm) ? fdm : []);
+      let rowsHtml = '';
+      commodities.forEach(c => {
+        const numChg = Number(c.change || 0);
+        const numPct = Number(c.change_pct || 0);
+        const cls = numPct >= 0 ? 'pos' : 'neg';
+        rowsHtml += `
           <tr>
-            <th>SYMBOL</th>
-            <th>COMMODITY CONTRACT</th>
-            <th>CATEGORY</th>
-            <th class="text-right">PRICE</th>
-            <th class="text-right">CHANGE</th>
-            <th class="text-right">% CHANGE</th>
-            <th class="text-right">QUOTATION UNIT</th>
+            <td><strong style="color: var(--amber-bright);">${c.symbol || c.commodity || 'CMD'}</strong></td>
+            <td>${c.name || c.commodity || 'Commodity'}</td>
+            <td><span class="badge" style="font-size: 9px;">${c.category || 'General'}</span></td>
+            <td class="text-right"><strong>${this.fmtNum(c.price != null ? c.price : c.spot, 2)}</strong></td>
+            <td class="text-right ${cls}">${this.fmtNum(numChg, 2)}</td>
+            <td class="text-right ${cls}"><strong>${this.fmtPct(numPct, 2)}</strong></td>
+            <td class="text-right neu">${c.unit || 'USD'}</td>
           </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
+        `;
+      });
 
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      body.innerHTML = `
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>SYMBOL</th>
+              <th>COMMODITY CONTRACT</th>
+              <th>CATEGORY</th>
+              <th class="text-right">PRICE</th>
+              <th class="text-right">CHANGE</th>
+              <th class="text-right">% CHANGE</th>
+              <th class="text-right">QUOTATION UNIT</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml || '<tr><td colspan="7" class="neu text-center">No commodities data available</td></tr>'}</tbody>
+        </table>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering FDM modal:', err);
+      this.showErrorModal('FDM', 'COMMODITIES ERROR', err.message);
+    }
   }
 
   showHelpModal(helpData) {
@@ -1203,464 +1327,522 @@ class TerminalController {
   }
 
   showEcoModal(ecoData) {
-    if (!ecoData) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!ecoData) {
+      this.showErrorModal('ECO', 'ECONOMIC CALENDAR', 'No economic calendar data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'ECO';
-    heading.innerText = 'GLOBAL ECONOMIC CALENDAR & MACRO RELEASES';
+      badge.innerText = 'ECO';
+      heading.innerText = 'GLOBAL ECONOMIC CALENDAR & MACRO RELEASES';
 
-    const events = ecoData.events || (Array.isArray(ecoData) ? ecoData : []);
-    let rowsHtml = '';
-    events.forEach(e => {
-      const impClass = e.impact === 'HIGH' ? 'impact-high' : (e.impact === 'MED' ? 'impact-med' : 'impact-low');
-      rowsHtml += `
-        <tr>
-          <td>${e.time}</td>
-          <td><strong>${e.country}</strong></td>
-          <td>${e.indicator}</td>
-          <td>${e.period}</td>
-          <td><strong>${e.actual}</strong></td>
-          <td class="neu">${e.consensus}</td>
-          <td class="neu">${e.prior}</td>
-          <td><span class="impact-badge ${impClass}">${e.impact}</span></td>
-        </tr>
-      `;
-    });
-
-    body.innerHTML = `
-      <table class="modal-table">
-        <thead>
+      const events = ecoData.events || (Array.isArray(ecoData) ? ecoData : []);
+      let rowsHtml = '';
+      events.forEach(e => {
+        const impact = (e.impact || 'MED').toUpperCase();
+        const impClass = impact === 'HIGH' ? 'impact-high' : (impact === 'MED' ? 'impact-med' : 'impact-low');
+        rowsHtml += `
           <tr>
-            <th>TIME</th>
-            <th>CTRY</th>
-            <th>INDICATOR</th>
-            <th>PERIOD</th>
-            <th>ACTUAL</th>
-            <th>CONSENSUS</th>
-            <th>PRIOR</th>
-            <th>IMPACT</th>
+            <td>${e.time || '--:--'}</td>
+            <td><strong>${e.country || 'US'}</strong></td>
+            <td>${e.indicator || e.event || 'Macro Event'}</td>
+            <td>${e.period || 'Current'}</td>
+            <td><strong>${e.actual != null ? e.actual : '--'}</strong></td>
+            <td class="neu">${e.consensus != null ? e.consensus : (e.forecast != null ? e.forecast : '--')}</td>
+            <td class="neu">${e.prior != null ? e.prior : '--'}</td>
+            <td><span class="impact-badge ${impClass}">${impact}</span></td>
           </tr>
-        </thead>
-        <tbody>${rowsHtml}</tbody>
-      </table>
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+        `;
+      });
+
+      body.innerHTML = `
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>TIME</th>
+              <th>CTRY</th>
+              <th>INDICATOR</th>
+              <th>PERIOD</th>
+              <th>ACTUAL</th>
+              <th>CONSENSUS</th>
+              <th>PRIOR</th>
+              <th>IMPACT</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml || '<tr><td colspan="8" class="neu text-center">No economic events scheduled</td></tr>'}</tbody>
+        </table>
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering ECO modal:', err);
+      this.showErrorModal('ECO', 'ECONOMIC CALENDAR ERROR', err.message);
+    }
   }
 
   showOmonModal(omon) {
-    if (!omon) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!omon) {
+      this.showErrorModal('OMON', 'OPTIONS MONITOR', 'No options chain data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'OMON';
-    heading.innerText = `${omon.symbol} // OPTIONS MONITOR & BLACK-SCHOLES GREEKS`;
+      badge.innerText = 'OMON';
+      heading.innerText = `${omon.symbol || this.currentTicker} // OPTIONS MONITOR & BLACK-SCHOLES GREEKS`;
 
-    let rowsHtml = '';
-    omon.chain.forEach(row => {
-      const isAtm = row.is_atm;
-      const isMaxPain = row.is_max_pain;
-      const rowStyle = isAtm ? 'background: rgba(255, 176, 0, 0.12); font-weight: bold;' : (isMaxPain ? 'background: rgba(0, 240, 255, 0.1);' : '');
-      const strikeBadge = isAtm ? ' <span style="color: var(--amber-bright); font-size: 9px;">[ATM]</span>' : (isMaxPain ? ' <span style="color: #00f0ff; font-size: 9px;">[MAX PAIN]</span>' : '');
+      let rowsHtml = '';
+      (omon.chain || []).forEach(row => {
+        const isAtm = row.is_atm;
+        const isMaxPain = row.is_max_pain;
+        const rowStyle = isAtm ? 'background: rgba(255, 176, 0, 0.12); font-weight: bold;' : (isMaxPain ? 'background: rgba(0, 240, 255, 0.1);' : '');
+        const strikeBadge = isAtm ? ' <span style="color: var(--amber-bright); font-size: 9px;">[ATM]</span>' : (isMaxPain ? ' <span style="color: #00f0ff; font-size: 9px;">[MAX PAIN]</span>' : '');
 
-      rowsHtml += `
-        <tr style="${rowStyle}">
-          <td class="text-right" style="color: #00f0ff;">${row.call_delta}</td>
-          <td class="text-right neu">${row.call_gamma}</td>
-          <td class="text-right neu">${row.call_theta}</td>
-          <td class="text-right neu">${row.call_vega}</td>
-          <td class="text-right" style="color: #00ff66;">${row.call_bid.toFixed(2)}</td>
-          <td class="text-right" style="color: #00ff66;">${row.call_ask.toFixed(2)}</td>
-          <td class="text-right neu">${(row.call_iv * 100).toFixed(1)}%</td>
-          <td class="text-center" style="font-weight: bold; color: var(--amber-bright); background: #1c1c1c; border-left: 1px solid #333; border-right: 1px solid #333;">${row.strike.toFixed(2)}${strikeBadge}</td>
-          <td class="text-right neu">${(row.put_iv * 100).toFixed(1)}%</td>
-          <td class="text-right" style="color: #ff3344;">${row.put_bid.toFixed(2)}</td>
-          <td class="text-right" style="color: #ff3344;">${row.put_ask.toFixed(2)}</td>
-          <td class="text-right neu">${row.put_vega}</td>
-          <td class="text-right neu">${row.put_theta}</td>
-          <td class="text-right neu">${row.put_gamma}</td>
-          <td class="text-right" style="color: #00f0ff;">${row.put_delta}</td>
-        </tr>
+        rowsHtml += `
+          <tr style="${rowStyle}">
+            <td class="text-right" style="color: #00f0ff;">${row.call_delta != null ? row.call_delta : 'N/A'}</td>
+            <td class="text-right neu">${row.call_gamma != null ? row.call_gamma : 'N/A'}</td>
+            <td class="text-right neu">${row.call_theta != null ? row.call_theta : 'N/A'}</td>
+            <td class="text-right neu">${row.call_vega != null ? row.call_vega : 'N/A'}</td>
+            <td class="text-right" style="color: #00ff66;">${this.fmtCur(row.call_bid, 2)}</td>
+            <td class="text-right" style="color: #00ff66;">${this.fmtCur(row.call_ask, 2)}</td>
+            <td class="text-right neu">${this.fmtPct(Number(row.call_iv || 0) * 100, 1, false)}</td>
+            <td class="text-center" style="font-weight: bold; color: var(--amber-bright); background: #1c1c1c; border-left: 1px solid #333; border-right: 1px solid #333;">${this.fmtNum(row.strike, 2)}${strikeBadge}</td>
+            <td class="text-right neu">${this.fmtPct(Number(row.put_iv || 0) * 100, 1, false)}</td>
+            <td class="text-right" style="color: #ff3344;">${this.fmtCur(row.put_bid, 2)}</td>
+            <td class="text-right" style="color: #ff3344;">${this.fmtCur(row.put_ask, 2)}</td>
+            <td class="text-right neu">${row.put_vega != null ? row.put_vega : 'N/A'}</td>
+            <td class="text-right neu">${row.put_theta != null ? row.put_theta : 'N/A'}</td>
+            <td class="text-right neu">${row.put_gamma != null ? row.put_gamma : 'N/A'}</td>
+            <td class="text-right" style="color: #00f0ff;">${row.put_delta != null ? row.put_delta : 'N/A'}</td>
+          </tr>
+        `;
+      });
+
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">UNDERLYING SPOT</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${this.fmtCur(omon.spot_price, 2)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">EXPIRATION (DTE)</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">${omon.expiration || 'FRONT'} (${omon.dte || 0} DTE)</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">ATM VOLATILITY (IV)</div>
+            <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${this.fmtPct(Number(omon.atm_iv || 0) * 100, 1, false)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">MAX PAIN STRIKE</div>
+            <div style="font-size: 16px; font-weight: bold; color: #ff00ea;">${this.fmtCur(omon.max_pain_strike, 2)}</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="modal-table" style="font-size: 11px;">
+            <thead>
+              <tr>
+                <th colspan="7" class="text-center" style="background: rgba(0, 255, 102, 0.1); color: #00ff66;">CALLS (BULLISH)</th>
+                <th class="text-center" style="background: #252525; color: var(--amber-bright);">STRIKE</th>
+                <th colspan="7" class="text-center" style="background: rgba(255, 51, 68, 0.1); color: #ff3344;">PUTS (BEARISH)</th>
+              </tr>
+              <tr>
+                <th class="text-right">DELTA (Δ)</th>
+                <th class="text-right">GAMMA (Γ)</th>
+                <th class="text-right">THETA (Θ)</th>
+                <th class="text-right">VEGA (ν)</th>
+                <th class="text-right">BID</th>
+                <th class="text-right">ASK</th>
+                <th class="text-right">IV</th>
+                <th class="text-center">STRIKE</th>
+                <th class="text-right">IV</th>
+                <th class="text-right">BID</th>
+                <th class="text-right">ASK</th>
+                <th class="text-right">VEGA (ν)</th>
+                <th class="text-right">THETA (Θ)</th>
+                <th class="text-right">GAMMA (Γ)</th>
+                <th class="text-right">DELTA (Δ)</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml || '<tr><td colspan="15" class="neu text-center">No option chain available</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          BLACK-SCHOLES CONTINUOUS FORMULATION // RISK-FREE RATE: 4.50% // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
+        </div>
       `;
-    });
-
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
-        <div>
-          <div style="font-size: 11px; color: var(--text-muted);">UNDERLYING SPOT</div>
-          <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">$${omon.spot_price.toFixed(2)}</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">EXPIRATION (DTE)</div>
-          <div style="font-size: 16px; font-weight: bold; color: #fff;">${omon.expiration} (${omon.dte} DTE)</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">ATM VOLATILITY (IV)</div>
-          <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${(omon.atm_iv * 100).toFixed(1)}%</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">MAX PAIN STRIKE</div>
-          <div style="font-size: 16px; font-weight: bold; color: #ff00ea;">$${omon.max_pain_strike.toFixed(2)}</div>
-        </div>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table class="modal-table" style="font-size: 11px;">
-          <thead>
-            <tr>
-              <th colspan="7" class="text-center" style="background: rgba(0, 255, 102, 0.1); color: #00ff66;">CALLS (BULLISH)</th>
-              <th class="text-center" style="background: #252525; color: var(--amber-bright);">STRIKE</th>
-              <th colspan="7" class="text-center" style="background: rgba(255, 51, 68, 0.1); color: #ff3344;">PUTS (BEARISH)</th>
-            </tr>
-            <tr>
-              <th class="text-right">DELTA (Δ)</th>
-              <th class="text-right">GAMMA (Γ)</th>
-              <th class="text-right">THETA (Θ)</th>
-              <th class="text-right">VEGA (ν)</th>
-              <th class="text-right">BID</th>
-              <th class="text-right">ASK</th>
-              <th class="text-right">IV</th>
-              <th class="text-center">STRIKE</th>
-              <th class="text-right">IV</th>
-              <th class="text-right">BID</th>
-              <th class="text-right">ASK</th>
-              <th class="text-right">VEGA (ν)</th>
-              <th class="text-right">THETA (Θ)</th>
-              <th class="text-right">GAMMA (Γ)</th>
-              <th class="text-right">DELTA (Δ)</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
-
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        BLACK-SCHOLES CONTINUOUS FORMULATION // RISK-FREE RATE: 4.50% // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering OMON modal:', err);
+      this.showErrorModal('OMON', 'OPTIONS MONITOR ERROR', err.message);
+    }
   }
 
   showMapsModal(mapData) {
-    if (!mapData) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!mapData) {
+      this.showErrorModal('MAPS', 'MARKET HEATMAP', 'No market heatmap data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'MAPS';
-    heading.innerText = `S&P 500 MARKET HEATMAP // GICS SECTOR TREEMAP (${mapData.index})`;
+      badge.innerText = 'MAPS';
+      heading.innerText = `S&P 500 MARKET HEATMAP // GICS SECTOR TREEMAP (${mapData.index || 'SPX'})`;
 
-    let sectorsHtml = '';
-    mapData.sectors.forEach(sec => {
-      let tickersHtml = '';
-      sec.constituents.forEach(stock => {
-        const isPos = stock.change_pct >= 0;
-        const sign = isPos ? '+' : '';
-        const bg = isPos ? (stock.change_pct > 2 ? 'rgba(0, 200, 80, 0.45)' : 'rgba(0, 160, 60, 0.3)') : (stock.change_pct < -2 ? 'rgba(220, 40, 50, 0.45)' : 'rgba(180, 40, 50, 0.3)');
-        const border = isPos ? '#00aa44' : '#cc2233';
+      let sectorsHtml = '';
+      (mapData.sectors || []).forEach(sec => {
+        let tickersHtml = '';
+        (sec.constituents || []).forEach(stock => {
+          const numPct = Number(stock.change_pct || 0);
+          const isPos = numPct >= 0;
+          const bg = isPos ? (numPct > 2 ? 'rgba(0, 200, 80, 0.45)' : 'rgba(0, 160, 60, 0.3)') : (numPct < -2 ? 'rgba(220, 40, 50, 0.45)' : 'rgba(180, 40, 50, 0.3)');
+          const border = isPos ? '#00aa44' : '#cc2233';
 
-        tickersHtml += `
-          <div class="treemap-card" data-symbol="${stock.symbol}" style="background: ${bg}; border: 1px solid ${border}; border-radius: 2px; padding: 6px 8px; cursor: pointer; flex: 1 1 90px; min-width: 80px; text-align: center; transition: transform 0.1s, box-shadow 0.1s;">
-            <div style="font-weight: bold; font-size: 13px; color: #fff;">${stock.symbol}</div>
-            <div style="font-size: 11px; font-weight: bold; color: ${isPos ? '#00ff66' : '#ff5566'};">${sign}${stock.change_pct.toFixed(2)}%</div>
-            <div style="font-size: 9px; color: rgba(255,255,255,0.7);">$${stock.price.toFixed(2)}</div>
-            <div style="font-size: 8px; color: #aaa;">$${stock.mkt_cap_b}B</div>
+          tickersHtml += `
+            <div class="treemap-card" data-symbol="${stock.symbol}" style="background: ${bg}; border: 1px solid ${border}; border-radius: 2px; padding: 6px 8px; cursor: pointer; flex: 1 1 90px; min-width: 80px; text-align: center; transition: transform 0.1s, box-shadow 0.1s;">
+              <div style="font-weight: bold; font-size: 13px; color: #fff;">${stock.symbol}</div>
+              <div style="font-size: 11px; font-weight: bold; color: ${isPos ? '#00ff66' : '#ff5566'};">${this.fmtPct(numPct, 2)}</div>
+              <div style="font-size: 9px; color: rgba(255,255,255,0.7);">${this.fmtCur(stock.price, 2)}</div>
+              <div style="font-size: 8px; color: #aaa;">$${stock.mkt_cap_b != null ? stock.mkt_cap_b : '--'}B</div>
+            </div>
+          `;
+        });
+
+        sectorsHtml += `
+          <div style="background: #111; border: 1px solid #282828; padding: 10px; margin-bottom: 12px; border-radius: 3px;">
+            <div style="font-size: 11px; font-weight: bold; color: var(--amber-bright); margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 4px;">
+              ${sec.sector || 'Sector'} (${(sec.constituents || []).length} STOCKS)
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              ${tickersHtml}
+            </div>
           </div>
         `;
       });
 
-      sectorsHtml += `
-        <div style="background: #111; border: 1px solid #282828; padding: 10px; margin-bottom: 12px; border-radius: 3px;">
-          <div style="font-size: 11px; font-weight: bold; color: var(--amber-bright); margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 4px;">
-            ${sec.sector} (${sec.constituents.length} STOCKS)
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 12px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">MARKET PERFORMANCE</div>
+            <div style="font-size: 15px; font-weight: bold; color: #fff;">${mapData.total_symbols || 0} KEY CONSTITUENTS</div>
           </div>
-          <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            ${tickersHtml}
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">ADVANCERS</div>
+            <div style="font-size: 15px; font-weight: bold; color: #00ff66;">${mapData.advancers || 0} TICKERS</div>
           </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">DECLINERS</div>
+            <div style="font-size: 15px; font-weight: bold; color: #ff3344;">${mapData.decliners || 0} TICKERS</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">ACTION</div>
+            <div style="font-size: 11px; color: var(--amber-bright); margin-top: 2px;">CLICK ANY TILE TO LOAD WORKSTATION CHART &amp; DEPTH</div>
+          </div>
+        </div>
+
+        <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
+          ${sectorsHtml || '<div class="neu text-center">No market sector data available</div>'}
+        </div>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
       `;
-    });
 
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 12px; background: #141414; padding: 10px; border: 1px solid #282828;">
-        <div>
-          <div style="font-size: 11px; color: var(--text-muted);">MARKET PERFORMANCE</div>
-          <div style="font-size: 15px; font-weight: bold; color: #fff;">${mapData.total_symbols} KEY CONSTITUENTS</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">ADVANCERS</div>
-          <div style="font-size: 15px; font-weight: bold; color: #00ff66;">${mapData.advancers} TICKERS</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">DECLINERS</div>
-          <div style="font-size: 15px; font-weight: bold; color: #ff3344;">${mapData.decliners} TICKERS</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">ACTION</div>
-          <div style="font-size: 11px; color: var(--amber-bright); margin-top: 2px;">CLICK ANY TILE TO LOAD WORKSTATION CHART &amp; DEPTH</div>
-        </div>
-      </div>
-
-      <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
-        ${sectorsHtml}
-      </div>
-
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-
-    // Wire clicks on treemap tiles to load ticker
-    body.querySelectorAll('.treemap-card').forEach(tile => {
-      tile.addEventListener('click', () => {
-        const sym = tile.dataset.symbol;
-        if (sym) {
-          this.closeModal();
-          this.executeCommand(`${sym} GP <GO>`);
-        }
+      // Wire clicks on treemap tiles to load ticker
+      body.querySelectorAll('.treemap-card').forEach(tile => {
+        tile.addEventListener('click', () => {
+          const sym = tile.dataset.symbol;
+          if (sym) {
+            this.closeModal();
+            this.executeCommand(`${sym} GP <GO>`);
+          }
+        });
       });
-    });
 
-    modal.classList.remove('hidden');
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering MAPS modal:', err);
+      this.showErrorModal('MAPS', 'HEATMAP ERROR', err.message);
+    }
   }
 
   showAiModal(ai) {
-    if (!ai) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!ai) {
+      this.showErrorModal('AI', 'AI RESEARCH', 'No research memo returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'AI';
-    heading.innerText = `${ai.symbol} // AUTONOMOUS EQUITY RESEARCH ANALYST MEMO`;
+      badge.innerText = 'AI';
+      heading.innerText = `${ai.symbol || this.currentTicker} // AUTONOMOUS EQUITY RESEARCH ANALYST MEMO`;
 
-    let moatsHtml = '';
-    ai.competitive_moat.forEach(m => {
-      moatsHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00f0ff;">${m.split(':')[0]}:</strong>${m.split(':').slice(1).join(':')}</li>`;
-    });
+      let moatsHtml = '';
+      (ai.competitive_moat || []).forEach(m => {
+        const parts = String(m).split(':');
+        moatsHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00f0ff;">${parts[0]}:</strong>${parts.slice(1).join(':')}</li>`;
+      });
 
-    let catHtml = '';
-    ai.growth_catalysts.forEach(c => {
-      catHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00ff66;">${c.split(':')[0]}:</strong>${c.split(':').slice(1).join(':')}</li>`;
-    });
+      let catHtml = '';
+      (ai.growth_catalysts || []).forEach(c => {
+        const parts = String(c).split(':');
+        catHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00ff66;">${parts[0]}:</strong>${parts.slice(1).join(':')}</li>`;
+      });
 
-    let riskHtml = '';
-    ai.downside_risks.forEach(r => {
-      riskHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #ff3344;">${r.split(':')[0]}:</strong>${r.split(':').slice(1).join(':')}</li>`;
-    });
+      let riskHtml = '';
+      (ai.downside_risks || []).forEach(r => {
+        const parts = String(r).split(':');
+        riskHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #ff3344;">${parts[0]}:</strong>${parts.slice(1).join(':')}</li>`;
+      });
 
-    const isBuy = ai.rating.includes('BUY') || ai.rating.includes('OUTPERFORM');
-    const ratingColor = isBuy ? '#00ff66' : '#ffb000';
+      const rating = ai.rating || 'NEUTRAL';
+      const isBuy = rating.includes('BUY') || rating.includes('OUTPERFORM');
+      const ratingColor = isBuy ? '#00ff66' : '#ffb000';
+      const val = ai.valuation_assessment || {};
 
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 12px; border: 1px solid #282828;">
-        <div>
-          <div style="font-size: 11px; color: var(--text-muted);">ANALYST RATING</div>
-          <div style="font-size: 18px; font-weight: bold; color: ${ratingColor};">${ai.rating}</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">PRICE TARGET (12M)</div>
-          <div style="font-size: 18px; font-weight: bold; color: var(--amber-bright);">$${ai.target_price.toFixed(2)}</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">IMPLIED UPSIDE</div>
-          <div style="font-size: 18px; font-weight: bold; color: #00ff66;">+${ai.upside_pct.toFixed(2)}%</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">SOURCE</div>
-          <div style="font-size: 12px; color: #fff; margin-top: 3px;">${ai.analyst}</div>
-        </div>
-      </div>
-
-      <div style="max-height: 480px; overflow-y: auto; padding-right: 6px; font-size: 12px; line-height: 1.5;">
-        <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-left: 3px solid var(--amber-bright);">
-          <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 6px; font-size: 12px;">EXECUTIVE INVESTMENT THESIS</div>
-          <div style="color: #eee;">${ai.investment_thesis}</div>
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-          <div style="background: #111; border: 1px solid #252525; padding: 12px; border-top: 2px solid #00f0ff;">
-            <div style="font-weight: bold; color: #00f0ff; margin-bottom: 8px;">COMPETITIVE MOAT &amp; DEFENSIVE ADVANTAGES</div>
-            <ul style="padding-left: 16px; margin: 0;">${moatsHtml}</ul>
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 12px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">ANALYST RATING</div>
+            <div style="font-size: 18px; font-weight: bold; color: ${ratingColor};">${rating}</div>
           </div>
-          <div style="background: #111; border: 1px solid #252525; padding: 12px; border-top: 2px solid #00ff66;">
-            <div style="font-weight: bold; color: #00ff66; margin-bottom: 8px;">HIGH-CONVICTION GROWTH CATALYSTS</div>
-            <ul style="padding-left: 16px; margin: 0;">${catHtml}</ul>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">PRICE TARGET (12M)</div>
+            <div style="font-size: 18px; font-weight: bold; color: var(--amber-bright);">${this.fmtCur(ai.target_price, 2)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">IMPLIED UPSIDE</div>
+            <div style="font-size: 18px; font-weight: bold; color: #00ff66;">${this.fmtPct(ai.upside_pct, 2)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">SOURCE</div>
+            <div style="font-size: 12px; color: #fff; margin-top: 3px;">${ai.analyst || 'Autonomous Research Engine'}</div>
           </div>
         </div>
 
-        <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-top: 2px solid #ff3344;">
-          <div style="font-weight: bold; color: #ff3344; margin-bottom: 8px;">DOWNSIDE SCENARIO &amp; KEY RISK FACTORS</div>
-          <ul style="padding-left: 16px; margin: 0;">${riskHtml}</ul>
+        <div style="max-height: 480px; overflow-y: auto; padding-right: 6px; font-size: 12px; line-height: 1.5;">
+          <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-left: 3px solid var(--amber-bright);">
+            <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 6px; font-size: 12px;">EXECUTIVE INVESTMENT THESIS</div>
+            <div style="color: #eee;">${ai.investment_thesis || 'No investment thesis provided.'}</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+            <div style="background: #111; border: 1px solid #252525; padding: 12px; border-top: 2px solid #00f0ff;">
+              <div style="font-weight: bold; color: #00f0ff; margin-bottom: 8px;">COMPETITIVE MOAT &amp; DEFENSIVE ADVANTAGES</div>
+              <ul style="padding-left: 16px; margin: 0;">${moatsHtml || '<li>No moats identified</li>'}</ul>
+            </div>
+            <div style="background: #111; border: 1px solid #252525; padding: 12px; border-top: 2px solid #00ff66;">
+              <div style="font-weight: bold; color: #00ff66; margin-bottom: 8px;">HIGH-CONVICTION GROWTH CATALYSTS</div>
+              <ul style="padding-left: 16px; margin: 0;">${catHtml || '<li>No catalysts identified</li>'}</ul>
+            </div>
+          </div>
+
+          <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-top: 2px solid #ff3344;">
+            <div style="font-weight: bold; color: #ff3344; margin-bottom: 8px;">DOWNSIDE SCENARIO &amp; KEY RISK FACTORS</div>
+            <ul style="padding-left: 16px; margin: 0;">${riskHtml || '<li>No specific downside risks highlighted</li>'}</ul>
+          </div>
+
+          <div style="background: #111; border: 1px solid #252525; padding: 12px;">
+            <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 8px;">VALUATION MULTIPLES &amp; MULTI-YEAR VERDICT</div>
+            <div style="display: flex; gap: 15px; margin-bottom: 8px; flex-wrap: wrap;">
+              <div><span style="color: #888;">FWD P/E:</span> <strong style="color: #fff;">${val.fwd_pe || 'N/A'}</strong></div>
+              <div><span style="color: #888;">EV/EBITDA:</span> <strong style="color: #fff;">${val.ev_ebitda || 'N/A'}</strong></div>
+              <div><span style="color: #888;">FCF YIELD:</span> <strong style="color: #00ff66;">${val.free_cash_flow_yield || 'N/A'}</strong></div>
+              <div><span style="color: #888;">DIV YIELD:</span> <strong style="color: var(--amber-bright);">${val.dividend_yield || 'N/A'}</strong></div>
+            </div>
+            <div style="color: #ffcc00; font-weight: bold; border-top: 1px solid #222; padding-top: 6px;">
+              VERDICT: ${val.verdict || 'Fairly valued'}
+            </div>
+          </div>
         </div>
 
-        <div style="background: #111; border: 1px solid #252525; padding: 12px;">
-          <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 8px;">VALUATION MULTIPLES &amp; MULTI-YEAR VERDICT</div>
-          <div style="display: flex; gap: 15px; margin-bottom: 8px; flex-wrap: wrap;">
-            <div><span style="color: #888;">FWD P/E:</span> <strong style="color: #fff;">${ai.valuation_assessment.fwd_pe}</strong></div>
-            <div><span style="color: #888;">EV/EBITDA:</span> <strong style="color: #fff;">${ai.valuation_assessment.ev_ebitda}</strong></div>
-            <div><span style="color: #888;">FCF YIELD:</span> <strong style="color: #00ff66;">${ai.valuation_assessment.free_cash_flow_yield}</strong></div>
-            <div><span style="color: #888;">DIV YIELD:</span> <strong style="color: var(--amber-bright);">${ai.valuation_assessment.dividend_yield}</strong></div>
-          </div>
-          <div style="color: #ffcc00; font-weight: bold; border-top: 1px solid #222; padding-top: 6px;">
-            VERDICT: ${ai.valuation_assessment.verdict}
-          </div>
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
         </div>
-      </div>
-
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
-        PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      `;
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering AI modal:', err);
+      this.showErrorModal('AI', 'AI RESEARCH ERROR', err.message);
+    }
   }
 
   showInsdModal(insd) {
-    if (!insd) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!insd) {
+      this.showErrorModal('INSD', 'INSIDER TRANSACTIONS', 'No insider data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'INSD';
-    heading.innerText = `${insd.symbol} // SEC FORM 4 INSIDER TRANSACTIONS`;
+      badge.innerText = 'INSD';
+      heading.innerText = `${insd.symbol || this.currentTicker} // SEC FORM 4 INSIDER TRANSACTIONS`;
 
-    const isBuySentiment = insd.sentiment.includes('BUY');
-    const sentColor = isBuySentiment ? '#00ff66' : '#ff3344';
+      const sentiment = insd.sentiment || 'NEUTRAL';
+      const isBuySentiment = sentiment.includes('BUY');
+      const sentColor = isBuySentiment ? '#00ff66' : '#ff3344';
 
-    let rowsHtml = '';
-    insd.transactions.forEach(t => {
-      const isSale = t.type.includes('Sale');
-      const typeColor = isSale ? '#ff3344' : '#00ff66';
-      rowsHtml += `
-        <tr>
-          <td>${t.date}</td>
-          <td><strong style="color: #fff;">${t.name}</strong></td>
-          <td class="neu">${t.title}</td>
-          <td style="color: ${typeColor}; font-weight: bold;">${t.type}</td>
-          <td class="text-right" style="color: ${typeColor};">${isSale ? '-' : '+'}${t.shares.toLocaleString()}</td>
-          <td class="text-right">$${t.price.toFixed(2)}</td>
-          <td class="text-right" style="font-weight: bold; color: ${typeColor};">$${t.value.toLocaleString()}</td>
-          <td class="text-right neu">${t.shares_owned.toLocaleString()}</td>
-        </tr>
+      let rowsHtml = '';
+      (insd.transactions || []).forEach(t => {
+        const tType = t.type || 'Transaction';
+        const isSale = tType.includes('Sale');
+        const typeColor = isSale ? '#ff3344' : '#00ff66';
+        const sharesNum = Number(t.shares || 0);
+        rowsHtml += `
+          <tr>
+            <td>${t.date || '--'}</td>
+            <td><strong style="color: #fff;">${t.name || 'Insider'}</strong></td>
+            <td class="neu">${t.title || '--'}</td>
+            <td style="color: ${typeColor}; font-weight: bold;">${tType}</td>
+            <td class="text-right" style="color: ${typeColor};">${isSale ? '-' : '+'}${sharesNum.toLocaleString()}</td>
+            <td class="text-right">${this.fmtCur(t.price, 2)}</td>
+            <td class="text-right" style="font-weight: bold; color: ${typeColor};">${this.fmtCur(t.value, 0)}</td>
+            <td class="text-right neu">${Number(t.shares_owned || 0).toLocaleString()}</td>
+          </tr>
+        `;
+      });
+
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">INSIDER SENTIMENT</div>
+            <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${sentiment}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">NET SHARES FLOW</div>
+            <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${Number(insd.net_shares_flow || 0).toLocaleString()} SHARES</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">PERIOD</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">${insd.period || 'LTM'}</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th>DATE</th>
+                <th>INSIDER NAME</th>
+                <th>CORPORATE TITLE</th>
+                <th>TRANSACTION TYPE</th>
+                <th class="text-right">SHARES</th>
+                <th class="text-right">PRICE</th>
+                <th class="text-right">NET VALUE</th>
+                <th class="text-right">POST SHARES</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml || '<tr><td colspan="8" class="neu text-center">No recent insider filings</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          DATA SOURCE: US SEC EDGAR ELECTRONIC FORM 4 SYSTEM // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
+        </div>
       `;
-    });
-
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
-        <div>
-          <div style="font-size: 11px; color: var(--text-muted);">INSIDER SENTIMENT</div>
-          <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${insd.sentiment}</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">NET SHARES FLOW</div>
-          <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${insd.net_shares_flow.toLocaleString()} SHARES</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">PERIOD</div>
-          <div style="font-size: 16px; font-weight: bold; color: #fff;">${insd.period}</div>
-        </div>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table class="modal-table">
-          <thead>
-            <tr>
-              <th>DATE</th>
-              <th>INSIDER NAME</th>
-              <th>CORPORATE TITLE</th>
-              <th>TRANSACTION TYPE</th>
-              <th class="text-right">SHARES</th>
-              <th class="text-right">PRICE</th>
-              <th class="text-right">NET VALUE</th>
-              <th class="text-right">POST SHARES</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
-
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        DATA SOURCE: US SEC EDGAR ELECTRONIC FORM 4 SYSTEM // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering INSD modal:', err);
+      this.showErrorModal('INSD', 'INSIDER TRANSACTIONS ERROR', err.message);
+    }
   }
 
   showHdsModal(hds) {
-    if (!hds) return;
-    const modal = document.getElementById('terminalModal');
-    const heading = document.getElementById('modalHeading');
-    const badge = document.getElementById('modalBadge');
-    const body = document.getElementById('modalBody');
+    if (!hds) {
+      this.showErrorModal('HDS', 'OWNERSHIP BREAKDOWN', 'No institutional data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
 
-    badge.innerText = 'HDS';
-    heading.innerText = `${hds.symbol} // 13F INSTITUTIONAL OWNERSHIP BREAKDOWN`;
+      badge.innerText = 'HDS';
+      heading.innerText = `${hds.symbol || this.currentTicker} // 13F INSTITUTIONAL OWNERSHIP BREAKDOWN`;
 
-    let rowsHtml = '';
-    hds.holders.forEach(h => {
-      const isPos = h.change_shares >= 0;
-      const chgColor = isPos ? '#00ff66' : '#ff3344';
-      const sign = isPos ? '+' : '';
-      rowsHtml += `
-        <tr>
-          <td class="text-center" style="color: var(--amber-bright); font-weight: bold;">${h.rank}</td>
-          <td><strong style="color: #fff;">${h.name}</strong></td>
-          <td class="text-right">${h.shares.toLocaleString()}</td>
-          <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">$${h.value_b.toFixed(2)}B</td>
-          <td class="text-right" style="color: #00f0ff; font-weight: bold;">${h.pct_float.toFixed(2)}%</td>
-          <td class="text-right" style="color: ${chgColor};">${sign}${h.change_shares.toLocaleString()}</td>
-          <td class="text-right neu">${h.date}</td>
-        </tr>
+      let rowsHtml = '';
+      (hds.holders || []).forEach(h => {
+        const chgNum = Number(h.change_shares || 0);
+        const isPos = chgNum >= 0;
+        const chgColor = isPos ? '#00ff66' : '#ff3344';
+        const sign = isPos ? '+' : '';
+        rowsHtml += `
+          <tr>
+            <td class="text-center" style="color: var(--amber-bright); font-weight: bold;">${h.rank || '--'}</td>
+            <td><strong style="color: #fff;">${h.name || 'Institutional Manager'}</strong></td>
+            <td class="text-right">${Number(h.shares || 0).toLocaleString()}</td>
+            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">$${this.fmtNum(h.value_b, 2)}B</td>
+            <td class="text-right" style="color: #00f0ff; font-weight: bold;">${this.fmtPct(h.pct_float, 2, false)}</td>
+            <td class="text-right" style="color: ${chgColor};">${sign}${chgNum.toLocaleString()}</td>
+            <td class="text-right neu">${h.date || '--'}</td>
+          </tr>
+        `;
+      });
+
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">TOP INSTITUTIONAL CONCENTRATION</div>
+            <div style="font-size: 16px; font-weight: bold; color: #00f0ff;">${this.fmtPct(hds.top_holders_ownership_pct, 1, false)} OF FLOAT</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">REPORTED HOLDERS</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">TOP ${hds.top_holders_count || 0} ASSET MANAGERS</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">REGULATORY FILING SOURCE</div>
+            <div style="font-size: 14px; font-weight: bold; color: var(--amber-bright);">${hds.source || 'SEC EDGAR 13F'}</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th class="text-center">RANK</th>
+                <th>INSTITUTIONAL MANAGER</th>
+                <th class="text-right">SHARES HELD</th>
+                <th class="text-right">MARKET VALUE ($B)</th>
+                <th class="text-right">% FLOAT</th>
+                <th class="text-right">Q/Q NET CHANGE</th>
+                <th class="text-right">REPORT DATE</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml || '<tr><td colspan="7" class="neu text-center">No institutional filings available</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          DATA SOURCE: US SEC EDGAR FORM 13F-HR // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
+        </div>
       `;
-    });
-
-    body.innerHTML = `
-      <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
-        <div>
-          <div style="font-size: 11px; color: var(--text-muted);">TOP INSTITUTIONAL CONCENTRATION</div>
-          <div style="font-size: 16px; font-weight: bold; color: #00f0ff;">${hds.top_holders_ownership_pct}% OF FLOAT</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">REPORTED HOLDERS</div>
-          <div style="font-size: 16px; font-weight: bold; color: #fff;">TOP ${hds.top_holders_count} ASSET MANAGERS</div>
-        </div>
-        <div style="border-left: 1px solid #282828; padding-left: 15px;">
-          <div style="font-size: 11px; color: var(--text-muted);">REGULATORY FILING SOURCE</div>
-          <div style="font-size: 14px; font-weight: bold; color: var(--amber-bright);">${hds.source}</div>
-        </div>
-      </div>
-
-      <div style="overflow-x: auto;">
-        <table class="modal-table">
-          <thead>
-            <tr>
-              <th class="text-center">RANK</th>
-              <th>INSTITUTIONAL MANAGER</th>
-              <th class="text-right">SHARES HELD</th>
-              <th class="text-right">MARKET VALUE ($B)</th>
-              <th class="text-right">% FLOAT</th>
-              <th class="text-right">Q/Q NET CHANGE</th>
-              <th class="text-right">REPORT DATE</th>
-            </tr>
-          </thead>
-          <tbody>${rowsHtml}</tbody>
-        </table>
-      </div>
-
-      <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
-        DATA SOURCE: US SEC EDGAR FORM 13F-HR // PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO CLOSE
-      </div>
-    `;
-    modal.classList.remove('hidden');
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering HDS modal:', err);
+      this.showErrorModal('HDS', 'OWNERSHIP ERROR', err.message);
+    }
   }
 
   closeModal() {
@@ -1694,16 +1876,16 @@ class TerminalController {
     if (!tbody || !indices) return;
     let html = '';
     indices.forEach(idx => {
-      const isPos = idx.change >= 0;
+      const numChg = Number(idx.change || 0);
+      const isPos = numChg >= 0;
       const cls = isPos ? 'pos' : 'neg';
-      const sign = isPos ? '+' : '';
       html += `
         <tr id="row-${idx.symbol}" data-symbol="${idx.symbol}">
           <td><strong>${idx.symbol}</strong></td>
-          <td class="neu">${idx.name}</td>
-          <td class="text-right" id="price-${idx.symbol}">${idx.price.toFixed(2)}</td>
-          <td class="text-right ${cls}" id="chg-${idx.symbol}">${sign}${idx.change.toFixed(2)}</td>
-          <td class="text-right ${cls}" id="pct-${idx.symbol}">${sign}${idx.change_pct.toFixed(2)}%</td>
+          <td class="neu">${idx.name || idx.symbol}</td>
+          <td class="text-right" id="price-${idx.symbol}">${this.fmtNum(idx.price, 2)}</td>
+          <td class="text-right ${cls}" id="chg-${idx.symbol}">${this.fmtNum(numChg, 2)}</td>
+          <td class="text-right ${cls}" id="pct-${idx.symbol}">${this.fmtPct(idx.change_pct, 2)}</td>
         </tr>
       `;
     });
@@ -1721,21 +1903,21 @@ class TerminalController {
   }
 
   updateEquitiesTicks(ticks) {
-    ticks.forEach(t => {
+    (ticks || []).forEach(t => {
       const priceEl = document.getElementById(`price-${t.symbol}`);
       const chgEl = document.getElementById(`chg-${t.symbol}`);
       const pctEl = document.getElementById(`pct-${t.symbol}`);
       if (priceEl && chgEl && pctEl) {
-        const isPos = t.change >= 0;
+        const numChg = Number(t.change || 0);
+        const isPos = numChg >= 0;
         const cls = isPos ? 'pos' : 'neg';
-        const sign = isPos ? '+' : '';
-        priceEl.innerText = t.price.toFixed(2);
+        priceEl.innerText = this.fmtNum(t.price, 2);
         priceEl.className = `text-right ${isPos ? 'tick-up' : 'tick-down'}`;
         setTimeout(() => { priceEl.className = 'text-right'; }, 350);
         chgEl.className = `text-right ${cls}`;
-        chgEl.innerText = `${sign}${t.change.toFixed(2)}`;
+        chgEl.innerText = this.fmtNum(numChg, 2);
         pctEl.className = `text-right ${cls}`;
-        pctEl.innerText = `${sign}${t.change_pct.toFixed(2)}%`;
+        pctEl.innerText = this.fmtPct(t.change_pct, 2);
       }
     });
   }
@@ -1773,7 +1955,7 @@ class TerminalController {
     if (!container || !curve) return;
     let html = `
       <div style="font-size: 11px; margin-bottom: 6px;">
-        <span>2Y/10Y SPREAD: <strong class="${curve.inverted ? 'neg' : 'pos'}">${curve.spread_2_10_bps} BPS</strong></span>
+        <span>2Y/10Y SPREAD: <strong class="${curve.inverted ? 'neg' : 'pos'}">${curve.spread_2_10_bps != null ? curve.spread_2_10_bps : 'N/A'} BPS</strong></span>
         ${curve.inverted ? '<span class="neg" style="margin-left: 8px;">[INVERTED]</span>' : ''}
       </div>
       <table class="terminal-table">
@@ -1782,14 +1964,14 @@ class TerminalController {
         </thead>
         <tbody>
     `;
-    curve.tenors.forEach(t => {
-      const cls = t.change >= 0 ? 'pos' : 'neg';
-      const sign = t.change >= 0 ? '+' : '';
+    (curve.tenors || []).forEach(t => {
+      const numChg = Number(t.change || 0);
+      const cls = numChg >= 0 ? 'pos' : 'neg';
       html += `
         <tr>
           <td>${t.tenor}</td>
-          <td class="text-right"><strong>${t.yield.toFixed(2)}%</strong></td>
-          <td class="text-right ${cls}">${sign}${t.change.toFixed(2)}</td>
+          <td class="text-right"><strong>${this.fmtPct(t.yield, 2, false)}</strong></td>
+          <td class="text-right ${cls}">${this.fmtNum(numChg, 2)}</td>
         </tr>
       `;
     });
