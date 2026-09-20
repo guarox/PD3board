@@ -141,6 +141,23 @@ async def test_command_ee():
     assert "quarterly_history" in ee
     assert len(ee["quarterly_history"]) >= 2
     assert "reported_eps" in ee["quarterly_history"][0]
+    assert "revenue_reported" in ee["quarterly_history"][0]
+    assert "rev_surprise_pct" in ee["quarterly_history"][0]
+    assert "forward_estimates" in ee
+
+    msi_res = await execute_command(CommandRequest(command="MSI EE <GO>"))
+    assert msi_res["success"] is True
+    msi_ee = msi_res["data"]
+    assert msi_ee["symbol"] == "MSI"
+    assert len(msi_ee["quarterly_history"]) >= 2
+    assert "revenue_reported" in msi_ee["quarterly_history"][0]
+
+    eth_res = await execute_command(CommandRequest(command="ETHUSDT EE <GO>"))
+    assert eth_res["success"] is True
+    eth_ee = eth_res["data"]
+    assert eth_ee["symbol"] == "ETHUSDT"
+    assert eth_ee.get("asset_type") == "DIGITAL_ASSET"
+    assert len(eth_ee["quarterly_history"]) >= 2
 
 @pytest.mark.asyncio
 async def test_command_world_macro():

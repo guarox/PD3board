@@ -228,7 +228,7 @@ class MarketDataClient:
         if modules is None:
             modules = [
                 "price", "summaryDetail", "assetProfile", "financialData",
-                "defaultKeyStatistics", "incomeStatementHistory",
+                "defaultKeyStatistics", "incomeStatementHistory", "incomeStatementHistoryQuarterly",
                 "balanceSheetHistory", "cashflowStatementHistory", "earningsTrend",
                 "recommendationTrend", "upgradeDowngradeHistory", "earningsHistory"
             ]
