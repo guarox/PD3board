@@ -654,7 +654,7 @@ class EquitiesFeed:
             return self.live_cache[sym]["data"]
 
         target = SYMBOL_MAP.get(sym, sym)
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}?interval=1m&range=1d"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}?interval=1m&range=1d&includePrePost=true"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         try:
             req = urllib.request.Request(url, headers=headers)
@@ -752,7 +752,7 @@ class EquitiesFeed:
         yf_interval, yf_range, cache_ttl = config_map[norm_interval]
 
         target = SYMBOL_MAP.get(sym, sym)
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}?interval={yf_interval}&range={yf_range}"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{target}?interval={yf_interval}&range={yf_range}&includePrePost=true"
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
         try:

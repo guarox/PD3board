@@ -369,7 +369,7 @@ class MarketDataClient:
         session = await self.get_session()
         # Equities / Indices: Multi-cluster Yahoo fallback (query1 -> query2)
         for host in ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]:
-            url = f"https://{host}/v8/finance/chart/{sym}?range={range_str}&interval={interval}"
+            url = f"https://{host}/v8/finance/chart/{sym}?range={range_str}&interval={interval}&includePrePost=true"
             try:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as r:
                     if r.status == 200:
