@@ -32,6 +32,7 @@ class PriceChart {
     this.currentPrice = 0;
     this.candles = [];
     this.rawCandles = [];
+    this.timeZoneMode = 'EST';
 
     // Indicator states
     this.indicators = {
@@ -74,6 +75,51 @@ class PriceChart {
     }
   }
 
+  setTimeZone(mode = 'EST') {
+    this.timeZoneMode = mode === 'UTC' ? 'UTC' : 'EST';
+    if (!this.chart) return;
+    const tz = this.timeZoneMode === 'UTC' ? 'UTC' : 'America/New_York';
+    const tzSuffix = this.timeZoneMode === 'UTC' ? ' UTC' : ' ET';
+
+    this.chart.applyOptions({
+      localization: {
+        locale: 'en-US',
+        dateFormat: 'yyyy-MM-dd',
+        timeFormatter: (ts) => {
+          if (!ts) return '';
+          const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts.year, ts.month - 1, ts.day);
+          return d.toLocaleTimeString('en-US', {
+            timeZone: tz,
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit'
+          }) + tzSuffix;
+        },
+      },
+      timeScale: {
+        tickMarkFormatter: (time, tickMarkType, locale) => {
+          if (!time) return '';
+          const d = typeof time === 'number' ? new Date(time * 1000) : new Date(time.year, time.month - 1, time.day);
+          if (tickMarkType === 0) {
+            return d.getFullYear().toString();
+          } else if (tickMarkType === 1) {
+            return d.toLocaleDateString('en-US', { timeZone: tz, month: 'short' });
+          } else if (tickMarkType === 2) {
+            return d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric', day: 'numeric' });
+          } else {
+            return d.toLocaleTimeString('en-US', {
+              timeZone: tz,
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+        },
+      }
+    });
+    this.updateHud(null);
+  }
+
   createHud() {
     let hud = this.container.querySelector('.chart-hud');
     if (!hud) {
@@ -92,6 +138,7 @@ class PriceChart {
     if (!targetBar) {
       this.hudElement.innerHTML = `
         <span class="hud-symbol">${this.symbol} [${this.interval}]</span>
+        <span>TIME: <span class="hud-val">--</span></span>
         <span>O: <span class="hud-val">--</span></span>
         <span>H: <span class="hud-val">--</span></span>
         <span>L: <span class="hud-val">--</span></span>
@@ -99,6 +146,16 @@ class PriceChart {
         <span>VOL: <span class="hud-val">--</span></span>
       `;
       return;
+    }
+
+    const tz = this.timeZoneMode === 'UTC' ? 'UTC' : 'America/New_York';
+    const tzSuffix = this.timeZoneMode === 'UTC' ? ' UTC' : ' ET';
+    let timeStr = '--';
+    if (targetBar.time) {
+      const d = typeof targetBar.time === 'number' ? new Date(targetBar.time * 1000) : new Date(targetBar.time.year, targetBar.time.month - 1, targetBar.time.day);
+      timeStr = this.interval === '1D'
+        ? d.toLocaleDateString('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
+        : d.toLocaleTimeString('en-US', { timeZone: tz, hour12: false, hour: '2-digit', minute: '2-digit' }) + tzSuffix;
     }
 
     const open = Number(targetBar.open);
@@ -128,6 +185,7 @@ class PriceChart {
 
     this.hudElement.innerHTML = `
       <span class="hud-symbol">${this.symbol} [${this.interval}]</span>
+      <span>TIME: <span class="hud-val">${timeStr}</span></span>
       <span>O: <span class="hud-val">${fmt(open)}</span></span>
       <span>H: <span class="hud-val">${fmt(high)}</span></span>
       <span>L: <span class="hud-val">${fmt(low)}</span></span>
@@ -145,10 +203,26 @@ class PriceChart {
 
     const w = this.container.clientWidth || 800;
     const h = this.container.clientHeight || 450;
+    const tz = this.timeZoneMode === 'UTC' ? 'UTC' : 'America/New_York';
+    const tzSuffix = this.timeZoneMode === 'UTC' ? ' UTC' : ' ET';
 
     this.chart = LightweightCharts.createChart(this.container, {
       width: w,
       height: h,
+      localization: {
+        locale: 'en-US',
+        dateFormat: 'yyyy-MM-dd',
+        timeFormatter: (ts) => {
+          if (!ts) return '';
+          const d = typeof ts === 'number' ? new Date(ts * 1000) : new Date(ts.year, ts.month - 1, ts.day);
+          return d.toLocaleTimeString('en-US', {
+            timeZone: tz,
+            hour12: false,
+            hour: '2-digit',
+            minute: '2-digit'
+          }) + tzSuffix;
+        },
+      },
       layout: {
         background: { type: 'solid', color: '#0a0a0a' },
         textColor: '#ffb000',
@@ -189,6 +263,24 @@ class PriceChart {
         rightOffset: 12,
         barSpacing: 6,
         minBarSpacing: 1,
+        tickMarkFormatter: (time, tickMarkType, locale) => {
+          if (!time) return '';
+          const d = typeof time === 'number' ? new Date(time * 1000) : new Date(time.year, time.month - 1, time.day);
+          if (tickMarkType === 0) {
+            return d.getFullYear().toString();
+          } else if (tickMarkType === 1) {
+            return d.toLocaleDateString('en-US', { timeZone: tz, month: 'short' });
+          } else if (tickMarkType === 2) {
+            return d.toLocaleDateString('en-US', { timeZone: tz, month: 'numeric', day: 'numeric' });
+          } else {
+            return d.toLocaleTimeString('en-US', {
+              timeZone: tz,
+              hour12: false,
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+          }
+        },
       },
       handleScroll: {
         mouseWheel: true,

@@ -316,6 +316,7 @@ class TerminalController {
     const switchClock = () => {
       this.clockMode = this.clockMode === 'EST' ? 'UTC' : 'EST';
       if (toggleClock) toggleClock.innerText = `TIME: ${this.clockMode}`;
+      if (this.priceChart) this.priceChart.setTimeZone(this.clockMode);
       this.saveState();
       this.sound.playKeyClick();
     };
@@ -663,8 +664,14 @@ class TerminalController {
 
       // Clock
       const toggleClock = document.getElementById('toggleClock');
-      if (toggleClock && state.clockMode) {
-        toggleClock.innerText = `TIME: ${state.clockMode}`;
+      if (state.clockMode) {
+        this.clockMode = state.clockMode;
+        if (toggleClock) {
+          toggleClock.innerText = `TIME: ${state.clockMode}`;
+        }
+        if (this.priceChart) {
+          this.priceChart.setTimeZone(state.clockMode);
+        }
       }
 
       // Interval button
