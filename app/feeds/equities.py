@@ -721,6 +721,7 @@ class EquitiesFeed:
                 return quote_data
         except Exception as e:
             logger.debug(f"Live market quote fetch failed for {symbol}: {e}")
+            self.live_cache[sym] = {"data": None, "expires": now + 60.0}
             return None
 
     def fetch_historical_candles(self, symbol: str, interval: str = "1M") -> List[Dict[str, Any]]:
@@ -757,7 +758,7 @@ class EquitiesFeed:
 
         try:
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=4.0) as res:
+            with urllib.request.urlopen(req, timeout=1.5) as res:
                 payload = json.loads(res.read().decode())
                 chart = payload.get("chart", {})
                 res_list = chart.get("result")
@@ -1001,14 +1002,14 @@ class EquitiesFeed:
     def get_wei_matrix(self) -> List[Dict[str, Any]]:
         matrix = []
         for symbol, data in self.indices.items():
-            quote = self.fetch_live_quote(symbol)
-            if quote:
-                price = quote["price"]
-                prev_close = quote["prev_close"]
+            cached = self.live_cache.get(symbol, {}).get("data")
+            if cached:
+                price = cached["price"]
+                prev_close = cached["prev_close"]
                 chg = round(price - prev_close, 2)
                 chg_pct = round((chg / prev_close) * 100, 2) if prev_close else 0.0
-                high = quote.get("day_high") or price
-                low = quote.get("day_low") or price
+                high = cached.get("day_high") or price
+                low = cached.get("day_low") or price
             else:
                 price = data["price"]
                 chg = round(data["price"] - data["prev_close"], 2)
@@ -1454,7 +1455,26 @@ class EquitiesFeed:
         quotes = await market_data_client.get_quotes(indices_to_fetch)
         results = []
         if quotes:
+            now = time.time()
             quote_map = {q["symbol"]: q for q in quotes}
+            for sym, data in self.indices.items():
+                mapped = SYMBOL_MAP.get(sym, sym)
+                if mapped in quote_map:
+                    q = quote_map[mapped]
+                    p = float(q.get("regularMarketPrice", data["price"]))
+                    prev = float(q.get("chartPreviousClose", q.get("regularMarketPrice", data["prev_close"])))
+                    self.live_cache[sym] = {
+                        "data": {
+                            "symbol": sym,
+                            "name": data["name"],
+                            "price": p,
+                            "prev_close": prev,
+                            "day_high": float(q.get("regularMarketDayHigh", p)),
+                            "day_low": float(q.get("regularMarketDayLow", p)),
+                        },
+                        "expires": now + 60.0
+                    }
+
             for item in self.get_wei_matrix():
                 sym = item["symbol"]
                 mapped = SYMBOL_MAP.get(sym, sym)

@@ -128,7 +128,7 @@ class WorldMacroFeed:
         headers = {"User-Agent": "Mozilla/5.0"}
         try:
             req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=2.5) as res:
+            with urllib.request.urlopen(req, timeout=1.0) as res:
                 payload = json.loads(res.read().decode())
                 return payload.get("chart", {}).get("result", [{}])[0].get("meta", {})
         except Exception:
