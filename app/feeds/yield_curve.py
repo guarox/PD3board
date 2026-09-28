@@ -6,6 +6,7 @@ import time
 import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional
+from app.feeds.market_data_client import market_data_client
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class YieldCurveFeed:
             url = f"https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value_month={m}"
             try:
                 req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=3.5) as res:
+                with urllib.request.urlopen(req, timeout=1.5) as res:
                     xml_text = res.read().decode("utf-8")
                     root = ET.fromstring(xml_text)
                     entries = root.findall("{http://www.w3.org/2005/Atom}entry")
@@ -133,7 +134,7 @@ class YieldCurveFeed:
             try:
                 url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?interval=1m&range=1d"
                 req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=1.8) as res:
+                with urllib.request.urlopen(req, timeout=0.8) as res:
                     payload = json.loads(res.read().decode())
                     meta = payload.get("chart", {}).get("result", [{}])[0].get("meta", {})
                     live_p = meta.get("regularMarketPrice")
@@ -148,28 +149,16 @@ class YieldCurveFeed:
     def refresh_curve_sync(self):
         """Synchronous refresh method."""
         now = time.time()
-        if now - self.last_fetch < self.cache_ttl:
-            return
+        self.last_fetch = now
 
-        live_tenors = self.fetch_live_treasury_curve()
-        if live_tenors:
-            self.tenors = self.enrich_with_intraday_ticks(live_tenors)
-            self.last_fetch = now
+        try:
+            live_tenors = self.fetch_live_treasury_curve()
+            if live_tenors:
+                self.tenors = self.enrich_with_intraday_ticks(live_tenors)
+        except Exception as e:
+            logger.debug(f"Failed to refresh curve sync: {e}")
 
-    async def refresh_curve(self) -> Dict[str, Any]:
-        """Asynchronous refresh task."""
-        loop = asyncio.get_running_loop()
-        await loop.run_in_executor(None, self.refresh_curve_sync)
-        return self.get_curve()
-
-    def get_curve(self) -> Dict[str, Any]:
-        # Refresh if cache expired
-        if time.time() - self.last_fetch >= self.cache_ttl:
-            try:
-                self.refresh_curve_sync()
-            except Exception as e:
-                logger.debug(f"Error during curve refresh: {e}")
-
+    def _build_curve_response(self) -> Dict[str, Any]:
         y2 = next((t["yield"] for t in self.tenors if t["tenor"] == "2Y"), 4.74)
         y10 = next((t["yield"] for t in self.tenors if t["tenor"] == "10Y"), 5.01)
         spread_2_10 = round((y10 - y2) * 100, 1)  # Basis points
@@ -184,6 +173,44 @@ class YieldCurveFeed:
             "inverted": spread_2_10 < 0
         }
 
+    def get_curve(self) -> Dict[str, Any]:
+        # Non-blocking check: if cache expired, trigger background refresh
+        now = time.time()
+        if now - self.last_fetch >= self.cache_ttl:
+            self.last_fetch = now
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.get_curve_async())
+            except RuntimeError:
+                try:
+                    self.refresh_curve_sync()
+                except Exception as e:
+                    logger.debug(f"Error during curve refresh: {e}")
+
+        return self._build_curve_response()
+
     async def get_curve_async(self) -> Dict[str, Any]:
-        return await self.refresh_curve()
+        now = time.time()
+        if now - self.last_fetch >= self.cache_ttl:
+            self.last_fetch = now
+            try:
+                treasury_data = await market_data_client.get_treasury_yield_curve()
+                if treasury_data:
+                    tenor_change_map = {t["tenor"]: t.get("change", 0.0) for t in self.tenors}
+                    updated_tenors = []
+                    for t in treasury_data:
+                        tenor_code = t["tenor"]
+                        y_val = t["yield"]
+                        chg = tenor_change_map.get(tenor_code, 0.0)
+                        updated_tenors.append({"tenor": tenor_code, "yield": y_val, "change": chg})
+                    if updated_tenors:
+                        self.tenors = updated_tenors
+                        self.as_of_date = datetime.date.today().isoformat()
+            except Exception as e:
+                logger.debug(f"Async curve refresh error: {e}")
+        return self._build_curve_response()
+
+    async def refresh_curve(self) -> Dict[str, Any]:
+        """Asynchronous refresh task."""
+        return await self.get_curve_async()
 

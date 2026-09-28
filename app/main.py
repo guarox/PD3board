@@ -279,7 +279,7 @@ async def equities_broadcaster():
             if broadcast_count % 30 == 0:
                 await broadcast({
                     "type": "yield_curve",
-                    "data": yield_curve_feed.get_curve()
+                    "data": await yield_curve_feed.get_curve_async()
                 })
 
             updates = equities_feed.update_ticks()
@@ -676,7 +676,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         await websocket.send_text(json.dumps({
             "type": "wei",
-            "data": equities_feed.get_wei_matrix()
+            "data": await equities_feed.get_wei_matrix_async()
         }))
 
         await websocket.send_text(json.dumps({
@@ -686,7 +686,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         await websocket.send_text(json.dumps({
             "type": "yield_curve",
-            "data": yield_curve_feed.get_curve()
+            "data": await yield_curve_feed.get_curve_async()
         }))
 
         while True:

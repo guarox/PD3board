@@ -267,5 +267,32 @@ def test_indices_baseline_prices():
     assert feed.indices["DJI"]["price"] >= 45000.0
     assert feed.get_security_price("SPX") >= 7000.0
 
+@pytest.mark.asyncio
+async def test_yield_curve_async_and_nonblocking():
+    import time
+    feed = YieldCurveFeed()
+    feed.last_fetch = 0.0  # Force expired cache
+    start = time.time()
+    # In an async context, get_curve() must return instantly without blocking event loop
+    curve = feed.get_curve()
+    elapsed = time.time() - start
+    assert elapsed < 0.1  # Must return immediately
+    assert "spread_2_10_bps" in curve
+    assert len(curve["tenors"]) >= 5
+
+    # Async version should also succeed cleanly
+    async_curve = await feed.get_curve_async()
+    assert "spread_2_10_bps" in async_curve
+    assert len(async_curve["tenors"]) >= 5
+
+@pytest.mark.asyncio
+async def test_wei_matrix_async():
+    from app.feeds.equities import EquitiesFeed
+    feed = EquitiesFeed()
+    matrix = await feed.get_wei_matrix_async()
+    assert len(matrix) >= 5
+    symbols = [item["symbol"] for item in matrix]
+    assert "SPX" in symbols
+
 
 
