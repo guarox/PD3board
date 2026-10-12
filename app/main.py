@@ -465,6 +465,8 @@ async def execute_command(req: CommandRequest):
         data = await insider_holdings_feed.get_institutional_holders_async(ticker)
     elif fn in {"AI", "RES"}:
         data = await ai_research_feed.generate_research_memo_async(ticker)
+    elif fn in {"LANG", "TRACE"}:
+        data = ai_research_feed.get_langfuse_telemetry()
     elif fn == "HELP":
         data = {
             "help": [
@@ -481,6 +483,7 @@ async def execute_command(req: CommandRequest):
                 {"mnemonic": "INSD", "desc": "SEC Form 4 Insider Trading Ledger (C-Suite & Director Trades)"},
                 {"mnemonic": "HDS", "desc": "13F Institutional Major Holders & Float Ownership Breakdown"},
                 {"mnemonic": "AI", "desc": "Autonomous AI Equity Research Analyst Investment Memo"},
+                {"mnemonic": "LANG", "desc": "Langfuse LLM Observability & Trace Telemetry Engine"},
                 {"mnemonic": "WIRP", "desc": "World Interest Rate Probabilities (FOMC Rate Hike/Cut Probabilities)"},
                 {"mnemonic": "WCRS", "desc": "World Currency Ranker (Global FX Performance vs USD)"},
                 {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
@@ -577,6 +580,10 @@ async def get_research(symbol: str):
     res = await ai_research_feed.generate_research_memo_async(symbol)
     return normalize_contract_payload("AI", res, symbol)
 
+@app.get("/api/langfuse/stats")
+async def get_langfuse_stats():
+    return ai_research_feed.get_langfuse_telemetry()
+
 @app.get("/api/help")
 async def get_help():
     return {
@@ -594,6 +601,7 @@ async def get_help():
             {"mnemonic": "INSD", "desc": "SEC Form 4 Insider Trading Ledger (C-Suite & Director Trades)"},
             {"mnemonic": "HDS", "desc": "13F Institutional Major Holders & Float Ownership Breakdown"},
             {"mnemonic": "AI", "desc": "Autonomous AI Equity Research Analyst Investment Memo"},
+            {"mnemonic": "LANG", "desc": "Langfuse LLM Observability & Trace Telemetry Engine"},
             {"mnemonic": "WIRP", "desc": "World Interest Rate Probabilities (FOMC Rate Hike/Cut Probabilities)"},
             {"mnemonic": "WCRS", "desc": "World Currency Ranker (Global FX Performance vs USD)"},
             {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
