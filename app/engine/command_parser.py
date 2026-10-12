@@ -5,13 +5,15 @@ SECTORS = {"EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"}
 FUNCTIONS = {
     "GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP",
     "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM",
-    "OMON", "MAPS", "HEAT", "AI", "RES", "INSD", "HDS"
+    "OMON", "MAPS", "HEAT", "AI", "RES", "INSD", "HDS",
+    "LANG", "TRACE"
 }
 
 # Aliases
 FUNCTION_ALIASES = {
     "HEAT": "MAPS",
-    "RES": "AI"
+    "RES": "AI",
+    "TRACE": "LANG"
 }
 
 class CommandParser:

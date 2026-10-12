@@ -994,6 +994,12 @@ class TerminalController {
           data = res.ok ? await res.json() : null;
         }
         this.showAiModal(data);
+      } else if (fn === 'LANG') {
+        if (!data) {
+          const res = await fetch('/api/langfuse/stats');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showLangfuseModal(data);
       } else if (fn === 'INSD') {
         if (!data) {
           const res = await fetch(`/api/insiders/${this.currentTicker}`);
@@ -2034,6 +2040,16 @@ class TerminalController {
             <div style="font-size: 11px; color: var(--text-muted);">SOURCE</div>
             <div style="font-size: 12px; color: #fff; margin-top: 3px;">${ai.analyst || 'Autonomous Research Engine'}</div>
           </div>
+          ${ai.langfuse_url ? `
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">OBSERVABILITY</div>
+            <div style="margin-top: 3px;">
+              <a href="${ai.langfuse_url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 2px 8px; background: #0f2d24; border: 1px solid #00ff66; color: #00ff66; text-decoration: none; font-size: 11px; border-radius: 2px; font-weight: bold;">
+                VIEW TRACE &gt;
+              </a>
+            </div>
+          </div>
+          ` : ''}
         </div>
 
         <div style="max-height: 480px; overflow-y: auto; padding-right: 6px; font-size: 12px; line-height: 1.5;">
@@ -2081,6 +2097,104 @@ class TerminalController {
     } catch (err) {
       console.error('Error rendering AI modal:', err);
       this.showErrorModal('AI', 'AI RESEARCH ERROR', err.message);
+    }
+  }
+
+  showLangfuseModal(stats) {
+    if (!stats) {
+      this.showErrorModal('LANG', 'LANGFUSE OBSERVABILITY', 'No telemetry data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
+
+      badge.innerText = 'LANG';
+      heading.innerText = 'LANGFUSE // LLM OBSERVABILITY & TRACE TELEMETRY';
+
+      const isOnline = Boolean(stats.enabled);
+      const statusColor = isOnline ? '#00ff66' : '#ffb000';
+      const statusText = isOnline ? 'ONLINE // STREAMING' : 'STANDBY // LOCAL BUFFER';
+
+      let rowsHtml = '';
+      const traces = stats.recent_traces || [];
+      if (traces.length === 0) {
+        rowsHtml = `<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No LLM research traces recorded yet. Run &lt;TICKER&gt; AI &lt;GO&gt; to generate telemetry.</td></tr>`;
+      } else {
+        traces.forEach(t => {
+          const ratingCls = (t.rating || '').includes('BUY') || (t.rating || '').includes('OUTPERFORM') ? 'pos' : 'neu';
+          rowsHtml += `
+            <tr>
+              <td style="color: var(--text-muted); font-size: 11px;">${t.timestamp || '--'}</td>
+              <td><strong>${t.symbol || '--'}</strong></td>
+              <td class="neu">${t.company_name || '--'}</td>
+              <td class="${ratingCls}"><strong>${t.rating || '--'}</strong></td>
+              <td class="text-right">${this.fmtCur(t.target_price, 2)}</td>
+              <td class="text-right pos">${this.fmtPct(t.upside_pct, 2)}</td>
+              <td class="text-right">
+                <a href="${t.url}" target="_blank" rel="noopener noreferrer" style="color: #00f0ff; text-decoration: underline; font-size: 11px;">
+                  INSPECT &gt;
+                </a>
+              </td>
+            </tr>
+          `;
+        });
+      }
+
+      body.innerHTML = `
+        <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 12px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 11px; color: var(--text-muted);">TELEMETRY STATUS</div>
+            <div style="font-size: 16px; font-weight: bold; color: ${statusColor};">${statusText}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">COLLECTOR ENDPOINT</div>
+            <div style="font-size: 13px; color: #fff; margin-top: 3px;">${stats.host || 'http://langfuse-web:3000'}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">TOTAL LLM TRACES</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${stats.total_traces || 0}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 15px;">
+            <div style="font-size: 11px; color: var(--text-muted);">EXTERNAL DASHBOARD</div>
+            <div style="margin-top: 3px;">
+              <a href="${stats.external_url || 'https://langfuse.home.gilbertopina.com'}" target="_blank" rel="noopener noreferrer" style="color: #00f0ff; text-decoration: underline; font-size: 12px; font-weight: bold;">
+                OPEN LANGFUSE WEB UI &gt;
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div style="max-height: 480px; overflow-y: auto;">
+          <table class="data-table" style="width: 100%;">
+            <thead>
+              <tr>
+                <th>TIMESTAMP</th>
+                <th>TICKER</th>
+                <th>SECURITY</th>
+                <th>VERDICT</th>
+                <th class="text-right">TARGET</th>
+                <th class="text-right">UPSIDE</th>
+                <th class="text-right">TELEMETRY</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+        </div>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 10px;">
+          PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
+        </div>
+      `;
+      this.setupModalExport(null);
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering Langfuse modal:', err);
+      this.showErrorModal('LANG', 'LANGFUSE TELEMETRY ERROR', err.message);
     }
   }
 
@@ -2251,7 +2365,7 @@ class TerminalController {
     if (modal) modal.classList.add('hidden');
     const modalExportBtn = document.getElementById('modalExportBtn');
     if (modalExportBtn) modalExportBtn.classList.add('hidden');
-    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM', 'OMON', 'MAPS', 'AI', 'INSD', 'HDS'];
+    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM', 'OMON', 'MAPS', 'AI', 'INSD', 'HDS', 'LANG'];
     if (modalFunctions.includes(this.currentFunction)) {
       this.setFunction('GP');
     }
