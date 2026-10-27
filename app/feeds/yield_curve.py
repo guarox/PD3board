@@ -6,7 +6,7 @@ import time
 import urllib.request
 import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional
-from app.feeds.market_data_client import market_data_client
+from app.feeds.market_data_client import market_data_client, safe_parse_xml
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +74,7 @@ class YieldCurveFeed:
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, timeout=1.5) as res:
                     xml_text = res.read().decode("utf-8")
-                    root = ET.fromstring(xml_text)
+                    root = safe_parse_xml(xml_text)
                     entries = root.findall("{http://www.w3.org/2005/Atom}entry")
                     if not entries:
                         continue

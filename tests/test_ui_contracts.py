@@ -122,10 +122,94 @@ async def test_all_registered_command_contracts():
         "AAPL INSD <GO>",
         "AAPL HDS <GO>",
         "NVDA AI <GO>",
+        "POLY <GO>",
+        "PRED <GO>",
     ]
-
     for cmd in commands:
         res = await execute_command(CommandRequest(command=cmd))
         assert res["success"] is True
         assert isinstance(res["data"], dict)
         assert len(res["data"]) > 0
+
+
+def test_safe_parse_xml_rejects_xxe():
+    """Verify safe_parse_xml blocks DOCTYPE and ENTITY declarations."""
+    from app.feeds.market_data_client import safe_parse_xml
+
+    valid_xml = "<rss><channel><item><title>Market Rally</title></item></channel></rss>"
+    root = safe_parse_xml(valid_xml)
+    assert root.tag == "rss"
+
+    xxe_xml = '<?xml version="1.0"?><!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><rss>&xxe;</rss>'
+    with pytest.raises(ValueError, match="Unsafe XML declaration"):
+        safe_parse_xml(xxe_xml)
+
+
+@pytest.mark.asyncio
+async def test_broadcast_evicts_failed_websocket_clients():
+    """Verify broadcast delivers concurrently and evicts broken WebSocket connections."""
+    from app.main import active_connections, broadcast
+
+    delivered = []
+
+    class HealthyWS:
+        async def send_text(self, payload: str):
+            delivered.append(payload)
+
+    class BrokenWS:
+        async def send_text(self, payload: str):
+            raise RuntimeError("Simulated broken pipe")
+
+    good_ws = HealthyWS()
+    bad_ws = BrokenWS()
+    active_connections.add(good_ws)
+    active_connections.add(bad_ws)
+    try:
+        await broadcast({"type": "ping", "ts": 123})
+        assert len(delivered) == 1
+        assert bad_ws not in active_connections
+        assert good_ws in active_connections
+    finally:
+        active_connections.discard(good_ws)
+        active_connections.discard(bad_ws)
+
+
+def test_frontend_xss_escaping_helpers_present():
+    """Verify terminal.js defines escapeHtml and orderbook.js coerces numeric values."""
+    import os
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "app", "static", "js"))
+    with open(os.path.join(base_dir, "terminal.js"), "r", encoding="utf-8") as f:
+        term_js = f.read()
+    assert "function escapeHtml(" in term_js
+    assert "this.escapeHtml(" in term_js
+
+
+def test_frontend_html_tabs_and_version_cache_parity():
+    """Verify every data-fn tab in index.html is wired in CommandParser and terminal.js, and ?v= matches VERSION."""
+    import os
+    import re
+    from app.engine.command_parser import FUNCTIONS
+
+    pd3_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    with open(os.path.join(pd3_root, "VERSION"), "r", encoding="utf-8") as f:
+        version = f.read().strip()
+    with open(os.path.join(pd3_root, "app", "static", "index.html"), "r", encoding="utf-8") as f:
+        index_html = f.read()
+    with open(os.path.join(pd3_root, "app", "static", "js", "terminal.js"), "r", encoding="utf-8") as f:
+        term_js = f.read()
+
+    for asset in ("/static/css/terminal.css", "/static/js/chart.js", "/static/js/orderbook.js", "/static/js/terminal.js"):
+        assert f"{asset}?v={version}" in index_html, f"Missing cache-buster {asset}?v={version} in index.html"
+
+    fn_tabs = re.findall(r'class="fn-tab[^"]*"\s+data-fn="([A-Z0-9_]+)"', index_html)
+    assert len(fn_tabs) >= 20
+    workspace_tabs = {"GP", "GIP", "L2", "WEI", "TOP", "YCRV"}
+    for fn in fn_tabs:
+        assert fn in FUNCTIONS, f"Tab data-fn='{fn}' missing from CommandParser.FUNCTIONS"
+        if fn not in workspace_tabs:
+            assert f"fn === '{fn}'" in term_js, f"Modal tab data-fn='{fn}' missing explicit branch in terminal.js executeFunction()"
+
+    assert not re.search(r"\}\s*else\s*\{\s*this\.closeModal\(\);\s*\}", term_js), (
+        "Bare silent fallthrough else { this.closeModal(); } is prohibited in terminal.js"
+    )
+

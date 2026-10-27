@@ -1,5 +1,10 @@
+import base64
+import datetime
+import json
 import logging
+import threading
 import time
+import urllib.request
 import uuid
 from typing import Dict, Any, Optional
 from app.config import Config
@@ -7,19 +12,27 @@ from app.feeds.market_data_client import market_data_client
 
 logger = logging.getLogger(__name__)
 
-# Initialize Langfuse client if configured
-langfuse_client = None
-if Config.LANGFUSE_PUBLIC_KEY and Config.LANGFUSE_SECRET_KEY:
+# Direct HTTP REST ingestion is enabled whenever keys and host are configured
+langfuse_enabled = bool(Config.LANGFUSE_PUBLIC_KEY and Config.LANGFUSE_SECRET_KEY and Config.LANGFUSE_HOST)
+
+
+def _post_langfuse_ingestion_batch(batch: list) -> None:
+    if not langfuse_enabled:
+        return
     try:
-        from langfuse import Langfuse
-        langfuse_client = Langfuse(
-            public_key=Config.LANGFUSE_PUBLIC_KEY,
-            secret_key=Config.LANGFUSE_SECRET_KEY,
-            host=Config.LANGFUSE_HOST
+        url = f"{Config.LANGFUSE_HOST.rstrip('/')}/api/public/ingestion"
+        creds = f"{Config.LANGFUSE_PUBLIC_KEY}:{Config.LANGFUSE_SECRET_KEY}"
+        auth_hdr = "Basic " + base64.b64encode(creds.encode("utf-8")).decode("ascii")
+        req = urllib.request.Request(
+            url,
+            data=json.dumps({"batch": batch}).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Authorization": auth_hdr},
+            method="POST",
         )
-        logger.info(f"Langfuse LLM observability client initialized with host {Config.LANGFUSE_HOST}")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            resp.read()
     except Exception as e:
-        logger.warning(f"Failed to initialize Langfuse client: {e}")
+        logger.warning(f"Error posting trace batch to Langfuse: {e}")
 
 class AIResearchFeed:
     """
@@ -43,6 +56,7 @@ class AIResearchFeed:
 
     _traces_history = []
     _trace_count = 0
+    _trace_lock = threading.Lock()
 
     @classmethod
     def _record_langfuse_trace(cls, symbol: str, spot_price: float, memo: Dict[str, Any]) -> Dict[str, Any]:
@@ -60,57 +74,76 @@ class AIResearchFeed:
             "upside_pct": memo.get("upside_pct", 0.0),
             "model": "vmg-dual-engine-ai",
             "url": external_url,
-            "status": "SENT" if langfuse_client else "OFFLINE"
+            "status": "SENT" if langfuse_enabled else "OFFLINE"
         }
-        cls._trace_count += 1
-        cls._traces_history.append(telemetry_item)
-        if len(cls._traces_history) > 50:
-            cls._traces_history.pop(0)
+        with cls._trace_lock:
+            cls._trace_count += 1
+            cls._traces_history.append(telemetry_item)
+            if len(cls._traces_history) > 50:
+                cls._traces_history.pop(0)
 
         memo["langfuse_trace_id"] = trace_id
         memo["langfuse_url"] = external_url
 
-        if langfuse_client:
-            try:
-                trace = langfuse_client.trace(
-                    id=trace_id,
-                    name="financial_research_memo",
-                    user_id="pd3board_analyst",
-                    session_id=f"pd3_{time.strftime('%Y%m%d')}",
-                    metadata={
-                        "symbol": symbol,
-                        "company_name": memo.get("company_name"),
-                        "rating": memo.get("rating"),
-                        "spot_price": spot_price,
-                        "target_price": memo.get("target_price"),
+        if langfuse_enabled:
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+            batch = [
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "trace-create",
+                    "timestamp": now_iso,
+                    "body": {
+                        "id": trace_id,
+                        "timestamp": now_iso,
+                        "name": f"pd3board_ai_research_{symbol}",
+                        "userId": "pd3board_analyst",
+                        "sessionId": f"pd3_{time.strftime('%Y%m%d')}",
+                        "input": f"Analyze equity/asset {symbol} at current spot price ${spot_price}",
+                        "output": {
+                            "rating": memo.get("rating"),
+                            "target_price": memo.get("target_price"),
+                            "upside_pct": memo.get("upside_pct"),
+                        },
+                        "metadata": {
+                            "service": "pd3board",
+                            "symbol": symbol,
+                            "company_name": memo.get("company_name"),
+                            "rating": memo.get("rating"),
+                            "spot_price": spot_price,
+                            "target_price": memo.get("target_price"),
+                        },
+                        "tags": ["pd3board", "ai_research", symbol, "production"],
                     },
-                    tags=["pd3board", "ai_research", symbol]
-                )
-                trace.generation(
-                    name="investment_memo_synthesis",
-                    model="vmg-dual-engine-ai",
-                    input=f"Analyze equity/asset {symbol} at current spot price ${spot_price}",
-                    output={
-                        "thesis": memo.get("investment_thesis"),
-                        "moat": memo.get("competitive_moat"),
-                        "valuation": memo.get("valuation_assessment")
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "type": "generation-create",
+                    "timestamp": now_iso,
+                    "body": {
+                        "id": str(uuid.uuid4()),
+                        "traceId": trace_id,
+                        "name": "investment_memo_synthesis",
+                        "startTime": now_iso,
+                        "endTime": now_iso,
+                        "model": "gemini-3.8-flash",
+                        "input": f"Analyze equity/asset {symbol} at current spot price ${spot_price}",
+                        "output": {
+                            "thesis": memo.get("investment_thesis"),
+                            "moat": memo.get("competitive_moat"),
+                            "valuation": memo.get("valuation_assessment"),
+                        },
+                        "usage": {"input": 420, "output": 680, "total": 1100, "unit": "TOKENS"},
                     },
-                    usage={
-                        "prompt_tokens": 420,
-                        "completion_tokens": 680,
-                        "total_tokens": 1100
-                    }
-                )
-                langfuse_client.flush()
-            except Exception as e:
-                logger.warning(f"Error flushing trace to Langfuse: {e}")
+                },
+            ]
+            threading.Thread(target=_post_langfuse_ingestion_batch, args=(batch,), daemon=True).start()
 
         return memo
 
     @classmethod
     def get_langfuse_telemetry(cls) -> Dict[str, Any]:
         return {
-            "enabled": langfuse_client is not None,
+            "enabled": langfuse_enabled,
             "host": Config.LANGFUSE_HOST,
             "external_url": Config.LANGFUSE_EXTERNAL_URL,
             "public_key_configured": bool(Config.LANGFUSE_PUBLIC_KEY),

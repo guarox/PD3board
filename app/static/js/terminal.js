@@ -3,6 +3,17 @@
  * Full Bloomberg Professional Service Workstation Experience
  */
 
+function escapeHtml(val) {
+  if (val === null || val === undefined) return '';
+  return String(val)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+window.escapeHtml = escapeHtml;
+
 class SoundEngine {
   constructor() {
     this.enabled = false;
@@ -186,7 +197,7 @@ class TerminalController {
       if (fnKeyMap[e.key]) {
         e.preventDefault();
         const mnemonic = fnKeyMap[e.key];
-        if (['WEI', 'ECO', 'YCRV', 'TOP', 'HELP'].includes(mnemonic)) {
+        if (['WEI', 'ECO', 'YCRV', 'TOP', 'HELP', 'WIRP', 'WCRS', 'FDM', 'MAPS', 'HEAT', 'POLY', 'PRED', 'PM', 'LANG', 'TRACE'].includes(mnemonic)) {
           this.executeCommand(`${mnemonic} <GO>`);
         } else {
           this.executeCommand(`${this.currentTicker} ${this.currentSector} ${mnemonic} <GO>`);
@@ -503,7 +514,7 @@ class TerminalController {
       statusClass = st === 'OPEN' ? 'pos' : (['AFTER-HOURS', 'PRE-MARKET'].includes(st) ? 'cyan' : 'neu');
     }
 
-    symbolBadge.innerHTML = `${ticker} ${sector} <span class="${statusClass}" style="margin-left: 6px; font-weight: bold; font-size: 11px;">[${statusText}]</span>`;
+    symbolBadge.innerHTML = `${this.escapeHtml(ticker)} ${this.escapeHtml(sector)} <span class="${this.escapeHtml(statusClass)}" style="margin-left: 6px; font-weight: bold; font-size: 11px;">[${this.escapeHtml(statusText)}]</span>`;
   }
 
   updateHeaderSpread(ob) {
@@ -576,8 +587,9 @@ class TerminalController {
       const resp = await res.json();
       if (resp.success) {
         const { ticker, sector, function: fn } = resp.parsed;
-        if (ticker) this.currentTicker = ticker;
-        if (sector) this.currentSector = sector;
+        const isPolyCmd = ['POLY', 'PRED', 'PM'].includes(fn);
+        if (ticker && !isPolyCmd) this.currentTicker = ticker;
+        if (sector && !isPolyCmd) this.currentSector = sector;
         if (fn) {
           this.setFunction(fn);
           this.executeFunction(fn, resp.data);
@@ -586,7 +598,7 @@ class TerminalController {
         // Update Header
         this.updateActiveSecurityBadge();
 
-        if (resp.data && resp.data.candles && resp.data.candles.length > 0) {
+        if (!isPolyCmd && resp.data && resp.data.candles && resp.data.candles.length > 0) {
           const curInt = this.priceChart ? this.priceChart.interval : '1M';
           if (this.priceChart && (!curInt || curInt === '1M')) {
             this.priceChart.setData(this.currentTicker, resp.data.candles, null, '1M');
@@ -595,8 +607,10 @@ class TerminalController {
           this.updateHeaderPrice(lastCandle.close, lastCandle.close >= lastCandle.open ? 'buy' : 'sell');
         }
 
-        this.loadHistoricalData(this.currentTicker);
-        this.loadOrderBook(this.currentTicker);
+        if (!isPolyCmd) {
+          this.loadHistoricalData(this.currentTicker);
+          this.loadOrderBook(this.currentTicker);
+        }
         if (this.cmdInput) this.cmdInput.value = '';
       }
       this.saveState();
@@ -606,9 +620,18 @@ class TerminalController {
   }
 
   setFunction(fn) {
-    this.currentFunction = fn;
+    const aliasMap = {
+      'RES': 'AI',
+      'HEAT': 'MAPS',
+      'TRACE': 'LANG',
+      'PRED': 'POLY',
+      'PM': 'POLY',
+      'NEWS': 'TOP'
+    };
+    const targetFn = aliasMap[fn] || fn;
+    this.currentFunction = targetFn;
     document.querySelectorAll('.fn-tab').forEach(t => {
-      t.classList.toggle('active', t.dataset.fn === fn);
+      t.classList.toggle('active', t.dataset.fn === targetFn);
     });
     this.saveState();
   }
@@ -830,12 +853,12 @@ class TerminalController {
     const putPoints = sorted.map(s => ({ x: getX(s.strike), y: getY(Number(s.put_iv || 0.25)), strike: s.strike, iv: s.put_iv }));
     const putPath = putPoints.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
 
-    let callCircles = callPoints.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#00ff66"><title>Call IV: ${(Number(p.iv || 0) * 100).toFixed(1)}% @ $${p.strike}</title></circle>`).join('');
-    let putCircles = putPoints.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#ff3344"><title>Put IV: ${(Number(p.iv || 0) * 100).toFixed(1)}% @ $${p.strike}</title></circle>`).join('');
+    let callCircles = callPoints.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#00ff66"><title>Call IV: ${(Number(p.iv || 0) * 100).toFixed(1)}% @ $${this.escapeHtml(p.strike)}</title></circle>`).join('');
+    let putCircles = putPoints.map(p => `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3" fill="#ff3344"><title>Put IV: ${(Number(p.iv || 0) * 100).toFixed(1)}% @ $${this.escapeHtml(p.strike)}</title></circle>`).join('');
 
     let strikeLabels = sorted.map(s => {
       const x = getX(s.strike);
-      return `<text x="${x.toFixed(1)}" y="${svgHeight - 8}" fill="#888" font-size="9" text-anchor="middle" font-family="monospace">$${s.strike}</text>`;
+      return `<text x="${x.toFixed(1)}" y="${svgHeight - 8}" fill="#888" font-size="9" text-anchor="middle" font-family="monospace">$${this.escapeHtml(s.strike)}</text>`;
     }).join('');
 
     let spotMarker = '';
@@ -885,6 +908,10 @@ class TerminalController {
     `;
   }
 
+  escapeHtml(val) {
+    return window.escapeHtml(val);
+  }
+
   fmtNum(val, dec = 2, fallback = 'N/A') {
     if (val === null || val === undefined || val === '' || isNaN(Number(val))) return fallback;
     return Number(val).toFixed(dec);
@@ -915,8 +942,8 @@ class TerminalController {
     body.innerHTML = `
       <div style="padding: 24px; text-align: center; border: 1px solid #ff3344; background: #1a0a0a; margin: 15px 0;">
         <div style="color: #ff3344; font-size: 14px; font-weight: bold; margin-bottom: 8px;">DATA FEED ADVISORY</div>
-        <div style="color: #fff; font-size: 12px; margin-bottom: 12px;">${message || 'Upstream provider did not return valid data for this security.'}</div>
-        <div style="font-size: 11px; color: var(--amber-dim);">TICKER: ${this.currentTicker} | FUNCTION: ${badgeText || 'N/A'}</div>
+        <div style="color: #fff; font-size: 12px; margin-bottom: 12px;">${this.escapeHtml(message || 'Upstream provider did not return valid data for this security.')}</div>
+        <div style="font-size: 11px; color: var(--amber-dim);">TICKER: ${this.escapeHtml(this.currentTicker)} | FUNCTION: ${this.escapeHtml(badgeText || 'N/A')}</div>
       </div>
       <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
         PRESS &lt;ESC&gt; OR CLICK &lt;CNCL&gt; TO RETURN TO WORKSPACE
@@ -926,7 +953,16 @@ class TerminalController {
     modal.classList.remove('hidden');
   }
 
-  async executeFunction(fn, data = null) {
+  async executeFunction(rawFn, data = null) {
+    const aliasMap = {
+      'RES': 'AI',
+      'HEAT': 'MAPS',
+      'TRACE': 'LANG',
+      'PRED': 'POLY',
+      'PM': 'POLY',
+      'NEWS': 'TOP'
+    };
+    const fn = aliasMap[rawFn] || rawFn;
     try {
       if (fn === 'DES') {
         if (!data) {
@@ -1000,6 +1036,12 @@ class TerminalController {
           data = res.ok ? await res.json() : null;
         }
         this.showLangfuseModal(data);
+      } else if (fn === 'POLY') {
+        if (!data) {
+          const res = await fetch('/api/polymarket');
+          data = res.ok ? await res.json() : null;
+        }
+        this.showPolyModal(data);
       } else if (fn === 'INSD') {
         if (!data) {
           const res = await fetch(`/api/insiders/${this.currentTicker}`);
@@ -1024,8 +1066,11 @@ class TerminalController {
           data = res.ok ? await res.json() : null;
         }
         this.showEcoModal(data);
-      } else {
+      } else if (['GP', 'GIP', 'L2', 'WEI', 'TOP', 'YCRV'].includes(fn)) {
         this.closeModal();
+      } else {
+        console.warn(`Unhandled terminal function mnemonic: ${fn}`);
+        this.showErrorModal(fn || 'CMD', 'UNSUPPORTED FUNCTION MNEMONIC', `Function '${fn}' is not registered in this workstation client. Refresh browser (Ctrl+Shift+R) or run HELP <GO>.`);
       }
     } catch (err) {
       console.error(`Error executing ${fn}:`, err);
@@ -1056,8 +1101,8 @@ class TerminalController {
       body.innerHTML = `
         <div style="margin-bottom: 12px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border-amber); padding-bottom: 6px;">
           <div>
-            <span style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${des.name || des.symbol || this.currentTicker}</span>
-            <span class="neu" style="margin-left: 8px;">[${des.exchange || 'US'} | ${des.industry || 'General'}]</span>
+            <span style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${this.escapeHtml(des.name || des.symbol || this.currentTicker)}</span>
+            <span class="neu" style="margin-left: 8px;">[${this.escapeHtml(des.exchange || 'US')} | ${this.escapeHtml(des.industry || 'General')}]</span>
           </div>
           <div>
             <span style="font-size: 16px; font-weight: bold; color: #fff;">${this.fmtNum(numPrice, 2)} USD</span>
@@ -1068,34 +1113,34 @@ class TerminalController {
         <div class="des-grid">
           <div class="des-card">
             <div class="des-card-title">VALUATION &amp; CAPITAL STRUCTURE</div>
-            <div class="des-row"><span class="des-label">MARKET CAP</span><span class="des-val">${des.market_cap || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">SHARES OUT</span><span class="des-val">${des.shares_out || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">P/E (TTM)</span><span class="des-val">${des.pe || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">FORWARD P/E</span><span class="des-val">${des.fwd_pe || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">DILUTED EPS</span><span class="des-val">${des.eps || 'N/A'}</span></div>
+            <div class="des-row"><span class="des-label">MARKET CAP</span><span class="des-val">${this.escapeHtml(des.market_cap || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">SHARES OUT</span><span class="des-val">${this.escapeHtml(des.shares_out || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">P/E (TTM)</span><span class="des-val">${this.escapeHtml(des.pe || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">FORWARD P/E</span><span class="des-val">${this.escapeHtml(des.fwd_pe || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">DILUTED EPS</span><span class="des-val">${this.escapeHtml(des.eps || 'N/A')}</span></div>
           </div>
 
           <div class="des-card">
             <div class="des-card-title">PRICE PERFORMANCE &amp; RISK</div>
-            <div class="des-row"><span class="des-label">52-WEEK RANGE</span><span class="des-val">${des.range_52w || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">BETA (5Y MONTHLY)</span><span class="des-val">${des.beta || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">DIVIDEND YIELD</span><span class="des-val">${des.dividend_yield || des.div_yield || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">EX-DIVIDEND DATE</span><span class="des-val">${des.ex_div_date || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">CURRENCY</span><span class="des-val">${des.currency || 'USD'}</span></div>
+            <div class="des-row"><span class="des-label">52-WEEK RANGE</span><span class="des-val">${this.escapeHtml(des.range_52w || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">BETA (5Y MONTHLY)</span><span class="des-val">${this.escapeHtml(des.beta || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">DIVIDEND YIELD</span><span class="des-val">${this.escapeHtml(des.dividend_yield || des.div_yield || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">EX-DIVIDEND DATE</span><span class="des-val">${this.escapeHtml(des.ex_div_date || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">CURRENCY</span><span class="des-val">${this.escapeHtml(des.currency || 'USD')}</span></div>
           </div>
 
           <div class="des-card">
             <div class="des-card-title">FINANCIAL PROFILE (TTM)</div>
-            <div class="des-row"><span class="des-label">REVENUE</span><span class="des-val">${des.revenue || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">NET INCOME</span><span class="des-val">${des.net_income || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">PRIMARY EXCHANGE</span><span class="des-val">${des.exchange || 'US'}</span></div>
+            <div class="des-row"><span class="des-label">REVENUE</span><span class="des-val">${this.escapeHtml(des.revenue || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">NET INCOME</span><span class="des-val">${this.escapeHtml(des.net_income || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">PRIMARY EXCHANGE</span><span class="des-val">${this.escapeHtml(des.exchange || 'US')}</span></div>
           </div>
 
           <div class="des-card">
             <div class="des-card-title">CORPORATE GOVERNANCE</div>
-            <div class="des-row"><span class="des-label">EXECUTIVE LEADERSHIP</span><span class="des-val">${des.ceo || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">GLOBAL HEADQUARTERS</span><span class="des-val">${des.hq || 'N/A'}</span></div>
-            <div class="des-row"><span class="des-label">SECTOR CLASSIFICATION</span><span class="des-val">${des.sector || 'EQUITY'}</span></div>
+            <div class="des-row"><span class="des-label">EXECUTIVE LEADERSHIP</span><span class="des-val">${this.escapeHtml(des.ceo || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">GLOBAL HEADQUARTERS</span><span class="des-val">${this.escapeHtml(des.hq || 'N/A')}</span></div>
+            <div class="des-row"><span class="des-label">SECTOR CLASSIFICATION</span><span class="des-val">${this.escapeHtml(des.sector || 'EQUITY')}</span></div>
           </div>
         </div>
         <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
@@ -1126,15 +1171,15 @@ class TerminalController {
 
       let brokersHtml = '';
       (anr.brokers || []).forEach(b => {
-        const rating = b.rating || 'HOLD';
+        const rating = String(b.rating || 'HOLD');
         const ratingCls = rating.includes('BUY') || rating.includes('OVERWEIGHT') ? 'pos' : (rating.includes('UNDER') || rating.includes('SELL') ? 'neg' : 'neu');
         brokersHtml += `
           <tr>
-            <td><strong>${b.firm || 'Wall Street'}</strong></td>
-            <td>${b.analyst || 'Analyst'}</td>
-            <td class="${ratingCls}"><strong>${rating}</strong></td>
+            <td><strong>${this.escapeHtml(b.firm || 'Wall Street')}</strong></td>
+            <td>${this.escapeHtml(b.analyst || 'Analyst')}</td>
+            <td class="${ratingCls}"><strong>${this.escapeHtml(rating)}</strong></td>
             <td class="text-right"><strong>${this.fmtCur(b.target, 2)}</strong></td>
-            <td class="text-right neu">${b.date || '2026'}</td>
+            <td class="text-right neu">${this.escapeHtml(b.date || '2026')}</td>
           </tr>
         `;
       });
@@ -1146,11 +1191,11 @@ class TerminalController {
         <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
           <div style="flex: 1;">
             <div style="font-size: 11px; color: var(--text-muted);">CONSENSUS RATING</div>
-            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${anr.consensus || 'HOLD'} (${this.fmtNum(anr.consensus_score, 1)} / 5.0)</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${this.escapeHtml(anr.consensus || 'HOLD')} (${this.fmtNum(anr.consensus_score, 1)} / 5.0)</div>
             <div style="font-size: 11px; margin-top: 4px;">
-              <span class="pos">${anr.buys || 0} BUYS</span> &bull; 
-              <span class="neu">${anr.holds || 0} HOLDS</span> &bull; 
-              <span class="neg">${anr.sells || 0} SELLS</span> (${anr.total_analysts || 0} TOTAL)
+              <span class="pos">${this.escapeHtml(anr.buys || 0)} BUYS</span> &bull; 
+              <span class="neu">${this.escapeHtml(anr.holds || 0)} HOLDS</span> &bull; 
+              <span class="neg">${this.escapeHtml(anr.sells || 0)} SELLS</span> (${this.escapeHtml(anr.total_analysts || 0)} TOTAL)
             </div>
           </div>
           <div style="flex: 1; border-left: 1px solid #282828; padding-left: 15px;">
@@ -1202,7 +1247,7 @@ class TerminalController {
       heading.innerText = `${fa.symbol || this.currentTicker} - FINANCIAL ANALYSIS (5-YEAR HISTORICAL)`;
 
       const years = fa.years || fa.periods || ['2021', '2022', '2023', '2024', '2025'];
-      const yearsHead = years.map(y => `<th class="text-right">${y}</th>`).join('');
+      const yearsHead = years.map(y => `<th class="text-right">${this.escapeHtml(y)}</th>`).join('');
 
       const renderRows = (items) => {
         if (!items) return '';
@@ -1217,8 +1262,8 @@ class TerminalController {
         }
         return list.map(item => `
           <tr>
-            <td>${item.metric || 'Metric'}</td>
-            ${(item.vals || []).map(v => `<td class="text-right"><strong>${v != null ? v : 'N/A'}</strong></td>`).join('')}
+            <td>${this.escapeHtml(item.metric || 'Metric')}</td>
+            ${(item.vals || []).map(v => `<td class="text-right"><strong>${this.escapeHtml(v != null ? v : 'N/A')}</strong></td>`).join('')}
           </tr>
         `).join('');
       };
@@ -1273,23 +1318,23 @@ class TerminalController {
         const isTarget = p.symbol === (rv.symbol || this.currentTicker);
         rowsHtml += `
           <tr style="${isTarget ? 'background: #221800; font-weight: bold;' : ''}">
-            <td><strong style="color: ${isTarget ? 'var(--amber-bright)' : '#fff'};">${p.symbol || 'N/A'}</strong></td>
-            <td>${p.name || 'Peer'}</td>
+            <td><strong style="color: ${isTarget ? 'var(--amber-bright)' : '#fff'};">${this.escapeHtml(p.symbol || 'N/A')}</strong></td>
+            <td>${this.escapeHtml(p.name || 'Peer')}</td>
             <td class="text-right">${this.fmtCur(p.price, 2)}</td>
-            <td class="text-right">${p.pe != null ? p.pe : 'N/A'}</td>
-            <td class="text-right">${p.fwd_pe != null ? p.fwd_pe : 'N/A'}</td>
-            <td class="text-right">${p.ev_ebitda != null ? p.ev_ebitda : 'N/A'}</td>
-            <td class="text-right">${p.ps != null ? p.ps : 'N/A'}</td>
-            <td class="text-right">${p.op_margin != null ? p.op_margin : 'N/A'}</td>
-            <td class="text-right">${p.roe != null ? p.roe : 'N/A'}</td>
-            <td class="text-right">${p.div_yield != null ? p.div_yield : 'N/A'}</td>
+            <td class="text-right">${this.escapeHtml(p.pe != null ? p.pe : 'N/A')}</td>
+            <td class="text-right">${this.escapeHtml(p.fwd_pe != null ? p.fwd_pe : 'N/A')}</td>
+            <td class="text-right">${this.escapeHtml(p.ev_ebitda != null ? p.ev_ebitda : 'N/A')}</td>
+            <td class="text-right">${this.escapeHtml(p.ps != null ? p.ps : 'N/A')}</td>
+            <td class="text-right">${this.escapeHtml(p.op_margin != null ? p.op_margin : 'N/A')}</td>
+            <td class="text-right">${this.escapeHtml(p.roe != null ? p.roe : 'N/A')}</td>
+            <td class="text-right">${this.escapeHtml(p.div_yield != null ? p.div_yield : 'N/A')}</td>
           </tr>
         `;
       });
 
       body.innerHTML = `
         <div style="margin-bottom: 8px; color: var(--amber-bright); font-weight: bold; font-size: 11px;">
-          GICS INDUSTRY PEER COMPARISON MATRIX [${rv.industry || 'General'}]
+          GICS INDUSTRY PEER COMPARISON MATRIX [${this.escapeHtml(rv.industry || 'General')}]
         </div>
         <table class="modal-table">
           <thead>
@@ -1361,12 +1406,12 @@ class TerminalController {
 
           histHtml += `
             <tr>
-              <td><strong>${q.quarter || 'N/A'}</strong></td>
+              <td><strong>${this.escapeHtml(q.quarter || 'N/A')}</strong></td>
               <td class="text-right">${repEps}</td>
               <td class="text-right neu">${conEps}</td>
-              <td class="text-right ${cls}"><strong>${surpStr}</strong></td>
-              <td class="text-right">${revStr}</td>
-              <td class="text-right ${revCls}">${revSurpStr}</td>
+              <td class="text-right ${cls}"><strong>${this.escapeHtml(surpStr)}</strong></td>
+              <td class="text-right">${this.escapeHtml(revStr)}</td>
+              <td class="text-right ${revCls}">${this.escapeHtml(revSurpStr)}</td>
             </tr>
           `;
         });
@@ -1385,11 +1430,11 @@ class TerminalController {
 
           fwdHtml += `
             <tr>
-              <td><strong>${f.quarter || 'N/A'}</strong></td>
+              <td><strong>${this.escapeHtml(f.quarter || 'N/A')}</strong></td>
               <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${conEps}</td>
               <td class="text-right neu">${lowEps}</td>
               <td class="text-right neu">${highEps}</td>
-              <td class="text-right">${estRev}</td>
+              <td class="text-right">${this.escapeHtml(estRev)}</td>
             </tr>
           `;
         });
@@ -1455,13 +1500,13 @@ class TerminalController {
       (wirp.meetings || []).forEach(m => {
         meetHtml += `
           <tr>
-            <td><strong>${m.date || m.meeting_date || 'N/A'}</strong></td>
-            <td class="text-right">${m.days_forward != null ? `${m.days_forward}d` : '--'}</td>
-            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${m.implied_rate || 'N/A'}</td>
+            <td><strong>${this.escapeHtml(m.date || m.meeting_date || 'N/A')}</strong></td>
+            <td class="text-right">${m.days_forward != null ? `${this.escapeHtml(m.days_forward)}d` : '--'}</td>
+            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${this.escapeHtml(m.implied_rate || 'N/A')}</td>
             <td class="text-right pos">${this.fmtPct(m.prob_cut_25bp != null ? m.prob_cut_25bp : m.cut_prob_pct, 1, false)}</td>
             <td class="text-right pos">${this.fmtPct(m.prob_cut_50bp != null ? m.prob_cut_50bp : 0, 1, false)}</td>
             <td class="text-right neu">${this.fmtPct(m.prob_hold != null ? m.prob_hold : m.hold_prob_pct, 1, false)}</td>
-            <td class="text-right" style="color: #00e5ff;">${m.bias || 'NEUTRAL'}</td>
+            <td class="text-right" style="color: #00e5ff;">${this.escapeHtml(m.bias || 'NEUTRAL')}</td>
           </tr>
         `;
       });
@@ -1470,15 +1515,15 @@ class TerminalController {
         <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
           <div>
             <div style="font-size: 11px; color: var(--text-muted);">CURRENT TARGET RATE</div>
-            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${wirp.current_target_rate || '4.75% - 5.00%'}</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${this.escapeHtml(wirp.current_target_rate || '4.75% - 5.00%')}</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">EFFECTIVE FED FUNDS (EFFR)</div>
-            <div style="font-size: 16px; font-weight: bold; color: #fff;">${wirp.effective_fed_funds_rate || '4.83%'}</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">${this.escapeHtml(wirp.effective_fed_funds_rate || '4.83%')}</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">TERMINAL RATE PROJECTION</div>
-            <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${wirp.terminal_rate || '3.50% - 3.75%'}</div>
+            <div style="font-size: 16px; font-weight: bold; color: #00e5ff;">${this.escapeHtml(wirp.terminal_rate || '3.50% - 3.75%')}</div>
           </div>
         </div>
 
@@ -1532,13 +1577,13 @@ class TerminalController {
         rowsHtml += `
           <tr>
             <td><strong>#${idx + 1}</strong></td>
-            <td><strong style="color: var(--amber-bright);">${c.pair || c.code || 'FX'}</strong></td>
-            <td>${c.name || 'Currency'}</td>
+            <td><strong style="color: var(--amber-bright);">${this.escapeHtml(c.pair || c.code || 'FX')}</strong></td>
+            <td>${this.escapeHtml(c.name || 'Currency')}</td>
             <td class="text-right"><strong>${this.fmtNum(c.spot, 4)}</strong></td>
             <td class="text-right ${cls}">${this.fmtNum(numChg, 4)}</td>
             <td class="text-right ${cls}"><strong>${this.fmtPct(numPct, 2)}</strong></td>
-            <td class="text-right neu">${c.range_52w || 'N/A'}</td>
-            <td class="text-right" style="color: #00e5ff;">${c.bias || 'NEUTRAL'}</td>
+            <td class="text-right neu">${this.escapeHtml(c.range_52w || 'N/A')}</td>
+            <td class="text-right" style="color: #00e5ff;">${this.escapeHtml(c.bias || 'NEUTRAL')}</td>
           </tr>
         `;
       });
@@ -1594,13 +1639,13 @@ class TerminalController {
         const cls = numPct >= 0 ? 'pos' : 'neg';
         rowsHtml += `
           <tr>
-            <td><strong style="color: var(--amber-bright);">${c.symbol || c.commodity || 'CMD'}</strong></td>
-            <td>${c.name || c.commodity || 'Commodity'}</td>
-            <td><span class="badge" style="font-size: 9px;">${c.category || 'General'}</span></td>
+            <td><strong style="color: var(--amber-bright);">${this.escapeHtml(c.symbol || c.commodity || 'CMD')}</strong></td>
+            <td>${this.escapeHtml(c.name || c.commodity || 'Commodity')}</td>
+            <td><span class="badge" style="font-size: 9px;">${this.escapeHtml(c.category || 'General')}</span></td>
             <td class="text-right"><strong>${this.fmtNum(c.price != null ? c.price : c.spot, 2)}</strong></td>
             <td class="text-right ${cls}">${this.fmtNum(numChg, 2)}</td>
             <td class="text-right ${cls}"><strong>${this.fmtPct(numPct, 2)}</strong></td>
-            <td class="text-right neu">${c.unit || 'USD'}</td>
+            <td class="text-right neu">${this.escapeHtml(c.unit || 'USD')}</td>
           </tr>
         `;
       });
@@ -1646,7 +1691,7 @@ class TerminalController {
     let funcsHtml = '';
     const funcs = helpData.functions || (helpData.help ? helpData.help.map(h => ({ mnemonic: h.mnemonic, desc: h.desc })) : []);
     funcs.forEach(f => {
-      funcsHtml += `<tr><td><strong style="color: var(--amber-primary);">${f.mnemonic} &lt;GO&gt;</strong></td><td>${f.desc}</td></tr>`;
+      funcsHtml += `<tr><td><strong style="color: var(--amber-primary);">${this.escapeHtml(f.mnemonic)} &lt;GO&gt;</strong></td><td>${this.escapeHtml(f.desc)}</td></tr>`;
     });
 
     body.innerHTML = `
@@ -1724,18 +1769,18 @@ class TerminalController {
       const events = ecoData.events || (Array.isArray(ecoData) ? ecoData : []);
       let rowsHtml = '';
       events.forEach(e => {
-        const impact = (e.impact || 'MED').toUpperCase();
+        const impact = String(e.impact || 'MED').toUpperCase();
         const impClass = impact === 'HIGH' ? 'impact-high' : (impact === 'MED' ? 'impact-med' : 'impact-low');
         rowsHtml += `
           <tr>
-            <td>${e.time || '--:--'}</td>
-            <td><strong>${e.country || 'US'}</strong></td>
-            <td>${e.indicator || e.event || 'Macro Event'}</td>
-            <td>${e.period || 'Current'}</td>
-            <td><strong>${e.actual != null ? e.actual : '--'}</strong></td>
-            <td class="neu">${e.consensus != null ? e.consensus : (e.forecast != null ? e.forecast : '--')}</td>
-            <td class="neu">${e.prior != null ? e.prior : '--'}</td>
-            <td><span class="impact-badge ${impClass}">${impact}</span></td>
+            <td>${this.escapeHtml(e.time || '--:--')}</td>
+            <td><strong>${this.escapeHtml(e.country || 'US')}</strong></td>
+            <td>${this.escapeHtml(e.indicator || e.event || 'Macro Event')}</td>
+            <td>${this.escapeHtml(e.period || 'Current')}</td>
+            <td><strong>${this.escapeHtml(e.actual != null ? e.actual : '--')}</strong></td>
+            <td class="neu">${this.escapeHtml(e.consensus != null ? e.consensus : (e.forecast != null ? e.forecast : '--'))}</td>
+            <td class="neu">${this.escapeHtml(e.prior != null ? e.prior : '--')}</td>
+            <td><span class="impact-badge ${impClass}">${this.escapeHtml(impact)}</span></td>
           </tr>
         `;
       });
@@ -1797,10 +1842,10 @@ class TerminalController {
 
         rowsHtml += `
           <tr style="${rowStyle}">
-            <td class="text-right" style="color: #00f0ff;">${row.call_delta != null ? row.call_delta : 'N/A'}</td>
-            <td class="text-right neu">${row.call_gamma != null ? row.call_gamma : 'N/A'}</td>
-            <td class="text-right neu">${row.call_theta != null ? row.call_theta : 'N/A'}</td>
-            <td class="text-right neu">${row.call_vega != null ? row.call_vega : 'N/A'}</td>
+            <td class="text-right" style="color: #00f0ff;">${this.escapeHtml(row.call_delta != null ? row.call_delta : 'N/A')}</td>
+            <td class="text-right neu">${this.escapeHtml(row.call_gamma != null ? row.call_gamma : 'N/A')}</td>
+            <td class="text-right neu">${this.escapeHtml(row.call_theta != null ? row.call_theta : 'N/A')}</td>
+            <td class="text-right neu">${this.escapeHtml(row.call_vega != null ? row.call_vega : 'N/A')}</td>
             <td class="text-right" style="color: #00ff66;">${this.fmtCur(row.call_bid, 2)}</td>
             <td class="text-right" style="color: #00ff66;">${this.fmtCur(row.call_ask, 2)}</td>
             <td class="text-right neu">${this.fmtPct(Number(row.call_iv || 0) * 100, 1, false)}</td>
@@ -1808,10 +1853,10 @@ class TerminalController {
             <td class="text-right neu">${this.fmtPct(Number(row.put_iv || 0) * 100, 1, false)}</td>
             <td class="text-right" style="color: #ff3344;">${this.fmtCur(row.put_bid, 2)}</td>
             <td class="text-right" style="color: #ff3344;">${this.fmtCur(row.put_ask, 2)}</td>
-            <td class="text-right neu">${row.put_vega != null ? row.put_vega : 'N/A'}</td>
-            <td class="text-right neu">${row.put_theta != null ? row.put_theta : 'N/A'}</td>
-            <td class="text-right neu">${row.put_gamma != null ? row.put_gamma : 'N/A'}</td>
-            <td class="text-right" style="color: #00f0ff;">${row.put_delta != null ? row.put_delta : 'N/A'}</td>
+            <td class="text-right neu">${this.escapeHtml(row.put_vega != null ? row.put_vega : 'N/A')}</td>
+            <td class="text-right neu">${this.escapeHtml(row.put_theta != null ? row.put_theta : 'N/A')}</td>
+            <td class="text-right neu">${this.escapeHtml(row.put_gamma != null ? row.put_gamma : 'N/A')}</td>
+            <td class="text-right" style="color: #00f0ff;">${this.escapeHtml(row.put_delta != null ? row.put_delta : 'N/A')}</td>
           </tr>
         `;
       });
@@ -1828,7 +1873,7 @@ class TerminalController {
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 12px;">
             <div style="font-size: 10px; color: var(--text-muted);">EXPIRATION (DTE)</div>
-            <div style="font-size: 15px; font-weight: bold; color: #fff;">${omon.expiration || 'FRONT'} (${omon.dte || 0} DTE)</div>
+            <div style="font-size: 15px; font-weight: bold; color: #fff;">${this.escapeHtml(omon.expiration || 'FRONT')} (${this.escapeHtml(omon.dte || 0)} DTE)</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 12px;">
             <div style="font-size: 10px; color: var(--text-muted);">ATM VOLATILITY (IV)</div>
@@ -1915,12 +1960,13 @@ class TerminalController {
           const bg = isPos ? (numPct > 2 ? 'rgba(0, 200, 80, 0.45)' : 'rgba(0, 160, 60, 0.3)') : (numPct < -2 ? 'rgba(220, 40, 50, 0.45)' : 'rgba(180, 40, 50, 0.3)');
           const border = isPos ? '#00aa44' : '#cc2233';
 
+          const safeSym = this.escapeHtml(stock.symbol);
           tickersHtml += `
-            <div class="treemap-card" data-symbol="${stock.symbol}" style="background: ${bg}; border: 1px solid ${border}; border-radius: 2px; padding: 6px 8px; cursor: pointer; flex: 1 1 90px; min-width: 80px; text-align: center; transition: transform 0.1s, box-shadow 0.1s;">
-              <div style="font-weight: bold; font-size: 13px; color: #fff;">${stock.symbol}</div>
+            <div class="treemap-card" data-symbol="${safeSym}" style="background: ${bg}; border: 1px solid ${border}; border-radius: 2px; padding: 6px 8px; cursor: pointer; flex: 1 1 90px; min-width: 80px; text-align: center; transition: transform 0.1s, box-shadow 0.1s;">
+              <div style="font-weight: bold; font-size: 13px; color: #fff;">${safeSym}</div>
               <div style="font-size: 11px; font-weight: bold; color: ${isPos ? '#00ff66' : '#ff5566'};">${this.fmtPct(numPct, 2)}</div>
               <div style="font-size: 9px; color: rgba(255,255,255,0.7);">${this.fmtCur(stock.price, 2)}</div>
-              <div style="font-size: 8px; color: #aaa;">$${stock.mkt_cap_b != null ? stock.mkt_cap_b : '--'}B</div>
+              <div style="font-size: 8px; color: #aaa;">$${this.escapeHtml(stock.mkt_cap_b != null ? stock.mkt_cap_b : '--')}B</div>
             </div>
           `;
         });
@@ -1928,7 +1974,7 @@ class TerminalController {
         sectorsHtml += `
           <div style="background: #111; border: 1px solid #282828; padding: 10px; margin-bottom: 12px; border-radius: 3px;">
             <div style="font-size: 11px; font-weight: bold; color: var(--amber-bright); margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #222; padding-bottom: 4px;">
-              ${sec.sector || 'Sector'} (${(sec.constituents || []).length} STOCKS)
+              ${this.escapeHtml(sec.sector || 'Sector')} (${(sec.constituents || []).length} STOCKS)
             </div>
             <div style="display: flex; flex-wrap: wrap; gap: 8px;">
               ${tickersHtml}
@@ -1941,15 +1987,15 @@ class TerminalController {
         <div style="display: flex; gap: 20px; margin-bottom: 12px; background: #141414; padding: 10px; border: 1px solid #282828;">
           <div>
             <div style="font-size: 11px; color: var(--text-muted);">MARKET PERFORMANCE</div>
-            <div style="font-size: 15px; font-weight: bold; color: #fff;">${mapData.total_symbols || 0} KEY CONSTITUENTS</div>
+            <div style="font-size: 15px; font-weight: bold; color: #fff;">${this.escapeHtml(mapData.total_symbols || 0)} KEY CONSTITUENTS</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">ADVANCERS</div>
-            <div style="font-size: 15px; font-weight: bold; color: #00ff66;">${mapData.advancers || 0} TICKERS</div>
+            <div style="font-size: 15px; font-weight: bold; color: #00ff66;">${this.escapeHtml(mapData.advancers || 0)} TICKERS</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">DECLINERS</div>
-            <div style="font-size: 15px; font-weight: bold; color: #ff3344;">${mapData.decliners || 0} TICKERS</div>
+            <div style="font-size: 15px; font-weight: bold; color: #ff3344;">${this.escapeHtml(mapData.decliners || 0)} TICKERS</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">ACTION</div>
@@ -2002,22 +2048,22 @@ class TerminalController {
       let moatsHtml = '';
       (ai.competitive_moat || []).forEach(m => {
         const parts = String(m).split(':');
-        moatsHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00f0ff;">${parts[0]}:</strong>${parts.slice(1).join(':')}</li>`;
+        moatsHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00f0ff;">${this.escapeHtml(parts[0])}:</strong>${this.escapeHtml(parts.slice(1).join(':'))}</li>`;
       });
 
       let catHtml = '';
       (ai.growth_catalysts || []).forEach(c => {
         const parts = String(c).split(':');
-        catHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00ff66;">${parts[0]}:</strong>${parts.slice(1).join(':')}</li>`;
+        catHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #00ff66;">${this.escapeHtml(parts[0])}:</strong>${this.escapeHtml(parts.slice(1).join(':'))}</li>`;
       });
 
       let riskHtml = '';
       (ai.downside_risks || []).forEach(r => {
         const parts = String(r).split(':');
-        riskHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #ff3344;">${parts[0]}:</strong>${parts.slice(1).join(':')}</li>`;
+        riskHtml += `<li style="margin-bottom: 6px; color: #ddd;"><strong style="color: #ff3344;">${this.escapeHtml(parts[0])}:</strong>${this.escapeHtml(parts.slice(1).join(':'))}</li>`;
       });
 
-      const rating = ai.rating || 'NEUTRAL';
+      const rating = String(ai.rating || 'NEUTRAL');
       const isBuy = rating.includes('BUY') || rating.includes('OUTPERFORM');
       const ratingColor = isBuy ? '#00ff66' : '#ffb000';
       const val = ai.valuation_assessment || {};
@@ -2026,7 +2072,7 @@ class TerminalController {
         <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 12px; border: 1px solid #282828;">
           <div>
             <div style="font-size: 11px; color: var(--text-muted);">ANALYST RATING</div>
-            <div style="font-size: 18px; font-weight: bold; color: ${ratingColor};">${rating}</div>
+            <div style="font-size: 18px; font-weight: bold; color: ${ratingColor};">${this.escapeHtml(rating)}</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">PRICE TARGET (12M)</div>
@@ -2038,13 +2084,13 @@ class TerminalController {
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">SOURCE</div>
-            <div style="font-size: 12px; color: #fff; margin-top: 3px;">${ai.analyst || 'Autonomous Research Engine'}</div>
+            <div style="font-size: 12px; color: #fff; margin-top: 3px;">${this.escapeHtml(ai.analyst || 'Autonomous Research Engine')}</div>
           </div>
           ${ai.langfuse_url ? `
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">OBSERVABILITY</div>
             <div style="margin-top: 3px;">
-              <a href="${ai.langfuse_url}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 2px 8px; background: #0f2d24; border: 1px solid #00ff66; color: #00ff66; text-decoration: none; font-size: 11px; border-radius: 2px; font-weight: bold;">
+              <a href="${this.escapeHtml(ai.langfuse_url)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 2px 8px; background: #0f2d24; border: 1px solid #00ff66; color: #00ff66; text-decoration: none; font-size: 11px; border-radius: 2px; font-weight: bold;">
                 VIEW TRACE &gt;
               </a>
             </div>
@@ -2055,7 +2101,7 @@ class TerminalController {
         <div style="max-height: 480px; overflow-y: auto; padding-right: 6px; font-size: 12px; line-height: 1.5;">
           <div style="background: #111; border: 1px solid #252525; padding: 12px; margin-bottom: 12px; border-left: 3px solid var(--amber-bright);">
             <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 6px; font-size: 12px;">EXECUTIVE INVESTMENT THESIS</div>
-            <div style="color: #eee;">${ai.investment_thesis || 'No investment thesis provided.'}</div>
+            <div style="color: #eee;">${this.escapeHtml(ai.investment_thesis || 'No investment thesis provided.')}</div>
           </div>
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
@@ -2077,13 +2123,13 @@ class TerminalController {
           <div style="background: #111; border: 1px solid #252525; padding: 12px;">
             <div style="font-weight: bold; color: var(--amber-bright); margin-bottom: 8px;">VALUATION MULTIPLES &amp; MULTI-YEAR VERDICT</div>
             <div style="display: flex; gap: 15px; margin-bottom: 8px; flex-wrap: wrap;">
-              <div><span style="color: #888;">FWD P/E:</span> <strong style="color: #fff;">${val.fwd_pe || 'N/A'}</strong></div>
-              <div><span style="color: #888;">EV/EBITDA:</span> <strong style="color: #fff;">${val.ev_ebitda || 'N/A'}</strong></div>
-              <div><span style="color: #888;">FCF YIELD:</span> <strong style="color: #00ff66;">${val.free_cash_flow_yield || 'N/A'}</strong></div>
-              <div><span style="color: #888;">DIV YIELD:</span> <strong style="color: var(--amber-bright);">${val.dividend_yield || 'N/A'}</strong></div>
+              <div><span style="color: #888;">FWD P/E:</span> <strong style="color: #fff;">${this.escapeHtml(val.fwd_pe || 'N/A')}</strong></div>
+              <div><span style="color: #888;">EV/EBITDA:</span> <strong style="color: #fff;">${this.escapeHtml(val.ev_ebitda || 'N/A')}</strong></div>
+              <div><span style="color: #888;">FCF YIELD:</span> <strong style="color: #00ff66;">${this.escapeHtml(val.free_cash_flow_yield || 'N/A')}</strong></div>
+              <div><span style="color: #888;">DIV YIELD:</span> <strong style="color: var(--amber-bright);">${this.escapeHtml(val.dividend_yield || 'N/A')}</strong></div>
             </div>
             <div style="color: #ffcc00; font-weight: bold; border-top: 1px solid #222; padding-top: 6px;">
-              VERDICT: ${val.verdict || 'Fairly valued'}
+              VERDICT: ${this.escapeHtml(val.verdict || 'Fairly valued')}
             </div>
           </div>
         </div>
@@ -2124,17 +2170,18 @@ class TerminalController {
         rowsHtml = `<tr><td colspan="7" class="text-center" style="padding: 20px; color: var(--text-muted);">No LLM research traces recorded yet. Run &lt;TICKER&gt; AI &lt;GO&gt; to generate telemetry.</td></tr>`;
       } else {
         traces.forEach(t => {
-          const ratingCls = (t.rating || '').includes('BUY') || (t.rating || '').includes('OUTPERFORM') ? 'pos' : 'neu';
+          const ratingStr = String(t.rating || '');
+          const ratingCls = ratingStr.includes('BUY') || ratingStr.includes('OUTPERFORM') ? 'pos' : 'neu';
           rowsHtml += `
             <tr>
-              <td style="color: var(--text-muted); font-size: 11px;">${t.timestamp || '--'}</td>
-              <td><strong>${t.symbol || '--'}</strong></td>
-              <td class="neu">${t.company_name || '--'}</td>
-              <td class="${ratingCls}"><strong>${t.rating || '--'}</strong></td>
+              <td style="color: var(--text-muted); font-size: 11px;">${this.escapeHtml(t.timestamp || '--')}</td>
+              <td><strong>${this.escapeHtml(t.symbol || '--')}</strong></td>
+              <td class="neu">${this.escapeHtml(t.company_name || '--')}</td>
+              <td class="${ratingCls}"><strong>${this.escapeHtml(t.rating || '--')}</strong></td>
               <td class="text-right">${this.fmtCur(t.target_price, 2)}</td>
               <td class="text-right pos">${this.fmtPct(t.upside_pct, 2)}</td>
               <td class="text-right">
-                <a href="${t.url}" target="_blank" rel="noopener noreferrer" style="color: #00f0ff; text-decoration: underline; font-size: 11px;">
+                <a href="${this.escapeHtml(t.url)}" target="_blank" rel="noopener noreferrer" style="color: #00f0ff; text-decoration: underline; font-size: 11px;">
                   INSPECT &gt;
                 </a>
               </td>
@@ -2151,16 +2198,16 @@ class TerminalController {
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">COLLECTOR ENDPOINT</div>
-            <div style="font-size: 13px; color: #fff; margin-top: 3px;">${stats.host || 'http://langfuse-web:3000'}</div>
+            <div style="font-size: 13px; color: #fff; margin-top: 3px;">${this.escapeHtml(stats.host || 'http://langfuse-web:3000')}</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">TOTAL LLM TRACES</div>
-            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${stats.total_traces || 0}</div>
+            <div style="font-size: 16px; font-weight: bold; color: var(--amber-bright);">${this.escapeHtml(stats.total_traces || 0)}</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">EXTERNAL DASHBOARD</div>
             <div style="margin-top: 3px;">
-              <a href="${stats.external_url || 'https://langfuse.home.gilbertopina.com'}" target="_blank" rel="noopener noreferrer" style="color: #00f0ff; text-decoration: underline; font-size: 12px; font-weight: bold;">
+              <a href="${this.escapeHtml(stats.external_url || 'https://langfuse.home.gilbertopina.com')}" target="_blank" rel="noopener noreferrer" style="color: #00f0ff; text-decoration: underline; font-size: 12px; font-weight: bold;">
                 OPEN LANGFUSE WEB UI &gt;
               </a>
             </div>
@@ -2212,22 +2259,22 @@ class TerminalController {
       badge.innerText = 'INSD';
       heading.innerText = `${insd.symbol || this.currentTicker} // SEC FORM 4 INSIDER TRANSACTIONS`;
 
-      const sentiment = insd.sentiment || 'NEUTRAL';
+      const sentiment = String(insd.sentiment || 'NEUTRAL');
       const isBuySentiment = sentiment.includes('BUY');
       const sentColor = isBuySentiment ? '#00ff66' : '#ff3344';
 
       let rowsHtml = '';
       (insd.transactions || []).forEach(t => {
-        const tType = t.type || 'Transaction';
+        const tType = String(t.type || 'Transaction');
         const isSale = tType.includes('Sale');
         const typeColor = isSale ? '#ff3344' : '#00ff66';
         const sharesNum = Number(t.shares || 0);
         rowsHtml += `
           <tr>
-            <td>${t.date || '--'}</td>
-            <td><strong style="color: #fff;">${t.name || 'Insider'}</strong></td>
-            <td class="neu">${t.title || '--'}</td>
-            <td style="color: ${typeColor}; font-weight: bold;">${tType}</td>
+            <td>${this.escapeHtml(t.date || '--')}</td>
+            <td><strong style="color: #fff;">${this.escapeHtml(t.name || 'Insider')}</strong></td>
+            <td class="neu">${this.escapeHtml(t.title || '--')}</td>
+            <td style="color: ${typeColor}; font-weight: bold;">${this.escapeHtml(tType)}</td>
             <td class="text-right" style="color: ${typeColor};">${isSale ? '-' : '+'}${sharesNum.toLocaleString()}</td>
             <td class="text-right">${this.fmtCur(t.price, 2)}</td>
             <td class="text-right" style="font-weight: bold; color: ${typeColor};">${this.fmtCur(t.value, 0)}</td>
@@ -2240,7 +2287,7 @@ class TerminalController {
         <div style="display: flex; gap: 20px; margin-bottom: 15px; background: #141414; padding: 10px; border: 1px solid #282828;">
           <div>
             <div style="font-size: 11px; color: var(--text-muted);">INSIDER SENTIMENT</div>
-            <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${sentiment}</div>
+            <div style="font-size: 16px; font-weight: bold; color: ${sentColor};">${this.escapeHtml(sentiment)}</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">NET SHARES FLOW</div>
@@ -2248,7 +2295,7 @@ class TerminalController {
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">PERIOD</div>
-            <div style="font-size: 16px; font-weight: bold; color: #fff;">${insd.period || 'LTM'}</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">${this.escapeHtml(insd.period || 'LTM')}</div>
           </div>
         </div>
 
@@ -2304,13 +2351,13 @@ class TerminalController {
         const sign = isPos ? '+' : '';
         rowsHtml += `
           <tr>
-            <td class="text-center" style="color: var(--amber-bright); font-weight: bold;">${h.rank || '--'}</td>
-            <td><strong style="color: #fff;">${h.name || 'Institutional Manager'}</strong></td>
+            <td class="text-center" style="color: var(--amber-bright); font-weight: bold;">${this.escapeHtml(h.rank || '--')}</td>
+            <td><strong style="color: #fff;">${this.escapeHtml(h.name || 'Institutional Manager')}</strong></td>
             <td class="text-right">${Number(h.shares || 0).toLocaleString()}</td>
             <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">$${this.fmtNum(h.value_b, 2)}B</td>
             <td class="text-right" style="color: #00f0ff; font-weight: bold;">${this.fmtPct(h.pct_float, 2, false)}</td>
             <td class="text-right" style="color: ${chgColor};">${sign}${chgNum.toLocaleString()}</td>
-            <td class="text-right neu">${h.date || '--'}</td>
+            <td class="text-right neu">${this.escapeHtml(h.date || '--')}</td>
           </tr>
         `;
       });
@@ -2323,11 +2370,11 @@ class TerminalController {
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">REPORTED HOLDERS</div>
-            <div style="font-size: 16px; font-weight: bold; color: #fff;">TOP ${hds.top_holders_count || 0} ASSET MANAGERS</div>
+            <div style="font-size: 16px; font-weight: bold; color: #fff;">TOP ${this.escapeHtml(hds.top_holders_count || 0)} ASSET MANAGERS</div>
           </div>
           <div style="border-left: 1px solid #282828; padding-left: 15px;">
             <div style="font-size: 11px; color: var(--text-muted);">REGULATORY FILING SOURCE</div>
-            <div style="font-size: 14px; font-weight: bold; color: var(--amber-bright);">${hds.source || 'SEC EDGAR 13F'}</div>
+            <div style="font-size: 14px; font-weight: bold; color: var(--amber-bright);">${this.escapeHtml(hds.source || 'SEC EDGAR 13F')}</div>
           </div>
         </div>
 
@@ -2360,12 +2407,134 @@ class TerminalController {
     }
   }
 
+  showPolyModal(polyData) {
+    if (!polyData) {
+      this.showErrorModal('POLY', 'POLYMARKET PREDICTION MARKETS', 'No prediction market data returned.');
+      return;
+    }
+    try {
+      const modal = document.getElementById('terminalModal');
+      const heading = document.getElementById('modalHeading');
+      const badge = document.getElementById('modalBadge');
+      const body = document.getElementById('modalBody');
+
+      badge.innerText = 'POLY';
+      heading.innerText = 'POLYMARKET CLOB // BINARY EVENT CONTRACTS & IMPLIED PROBABILITIES';
+
+      const markets = polyData.markets || [];
+      const fmtVol = (v) => {
+        const num = Number(v || 0);
+        if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;
+        if (num >= 1e3) return `$${(num / 1e3).toFixed(1)}K`;
+        return `$${num.toFixed(0)}`;
+      };
+
+      let rowsHtml = '';
+      markets.forEach(m => {
+        const prob = Number(m.probability_pct != null ? m.probability_pct : (Number(m.yes_price || 0) * 100));
+        const yesPrice = Number(m.yes_price || 0);
+        const noPrice = Number(m.no_price || (1 - yesPrice));
+        const chg = Number(m.change_24h_pct || 0);
+        const isPos = chg >= 0;
+        const chgColor = isPos ? '#00ff66' : '#ff3344';
+        const barColor = prob >= 65 ? '#00ff66' : (prob <= 35 ? '#ff3344' : '#ffb000');
+        const clampProb = Math.max(2, Math.min(98, prob));
+
+        const safeSlug = this.escapeHtml(m.slug || '');
+        const polyUrl = safeSlug ? `https://polymarket.com/event/${safeSlug}` : 'https://polymarket.com';
+        rowsHtml += `
+          <tr class="poly-market-row" data-url="${polyUrl}" style="cursor: pointer;" title="Click to open contract on Polymarket.com">
+            <td><span class="badge" style="font-size: 9px; padding: 1px 5px;">${this.escapeHtml(m.category || 'EVENT')}</span></td>
+            <td style="max-width: 360px;">
+              <div style="color: #fff; font-weight: bold;">${this.escapeHtml(m.question || m.slug)} <span style="color: var(--amber-dim); font-size: 9px; margin-left: 4px;">[OPEN &nearr;]</span></div>
+            </td>
+            <td style="min-width: 130px;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="color: ${barColor}; font-weight: bold; min-width: 42px; text-align: right;">${prob.toFixed(1)}%</span>
+                <div style="flex: 1; height: 6px; background: #222; border: 1px solid #333; overflow: hidden;">
+                  <div style="width: ${clampProb}%; height: 100%; background: ${barColor};"></div>
+                </div>
+              </div>
+            </td>
+            <td class="text-right" style="color: #00ff66; font-weight: bold;">$${yesPrice.toFixed(3)}</td>
+            <td class="text-right" style="color: #ff3344; font-weight: bold;">$${noPrice.toFixed(3)}</td>
+            <td class="text-right neu">${this.fmtNum(m.spread_cents, 1)}c</td>
+            <td class="text-right" style="color: ${chgColor}; font-weight: bold;">${this.fmtPct(chg, 1)}</td>
+            <td class="text-right" style="color: var(--amber-bright); font-weight: bold;">${fmtVol(m.volume_24h)}</td>
+            <td class="text-right" style="color: #00f0ff;">${fmtVol(m.liquidity)}</td>
+            <td class="text-right neu">${this.escapeHtml(m.end_date || '--')}</td>
+          </tr>
+        `;
+      });
+
+      body.innerHTML = `
+        <div style="display: flex; flex-wrap: wrap; gap: 18px; margin-bottom: 14px; background: #141414; padding: 10px; border: 1px solid #282828;">
+          <div>
+            <div style="font-size: 10px; color: var(--text-muted);">EXCHANGE ARCHITECTURE</div>
+            <div style="font-size: 13px; font-weight: bold; color: var(--amber-bright);">${this.escapeHtml(polyData.exchange || 'POLYMARKET CLOB')}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 14px;">
+            <div style="font-size: 10px; color: var(--text-muted);">24H CLOB VOLUME</div>
+            <div style="font-size: 15px; font-weight: bold; color: #00ff66;">${fmtVol(polyData.total_volume_24h)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 14px;">
+            <div style="font-size: 10px; color: var(--text-muted);">OPEN BOOK LIQUIDITY</div>
+            <div style="font-size: 15px; font-weight: bold; color: #00f0ff;">${fmtVol(polyData.total_liquidity)}</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 14px;">
+            <div style="font-size: 10px; color: var(--text-muted);">AVG TOP-OF-BOOK SPREAD</div>
+            <div style="font-size: 15px; font-weight: bold; color: #fff;">${this.fmtNum(polyData.avg_spread_cents, 2)} CENTS</div>
+          </div>
+          <div style="border-left: 1px solid #282828; padding-left: 14px;">
+            <div style="font-size: 10px; color: var(--text-muted);">SETTLEMENT &amp; ORACLE</div>
+            <div style="font-size: 12px; font-weight: bold; color: #ccc;">${this.escapeHtml(polyData.settlement_asset || 'USDC')} // ${this.escapeHtml(polyData.oracle || 'UMA / CFTC DCM')}</div>
+          </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="modal-table">
+            <thead>
+              <tr>
+                <th>CAT</th>
+                <th>EVENT CONTRACT / QUESTION</th>
+                <th>IMPLIED PROB</th>
+                <th class="text-right">YES ($)</th>
+                <th class="text-right">NO ($)</th>
+                <th class="text-right">SPREAD</th>
+                <th class="text-right">24H CHG</th>
+                <th class="text-right">24H VOL</th>
+                <th class="text-right">LIQUIDITY</th>
+                <th class="text-right">EXPIRY</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml || '<tr><td colspan="10" class="neu text-center">No active prediction markets available</td></tr>'}</tbody>
+          </table>
+        </div>
+
+        <div style="text-align: right; font-size: 10px; color: var(--text-muted); margin-top: 12px;">
+          DATA SOURCE: ${this.escapeHtml(polyData.source || 'POLYMARKET GAMMA + CLOB API')} // TIP: RUN &quot;MACRO POLY &lt;GO&gt;&quot; OR &quot;BTC POLY &lt;GO&gt;&quot; TO FILTER // PRESS &lt;ESC&gt; TO CLOSE
+        </div>
+      `;
+      body.querySelectorAll('.poly-market-row').forEach(row => {
+        row.addEventListener('click', () => {
+          const url = row.dataset.url;
+          if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        });
+      });
+      this.setupModalExport(body.querySelector('table'), 'POLYMARKET_EVENT_CONTRACTS.csv');
+      modal.classList.remove('hidden');
+    } catch (err) {
+      console.error('Error rendering POLY modal:', err);
+      this.showErrorModal('POLY', 'POLYMARKET ERROR', err.message);
+    }
+  }
+
   closeModal() {
     const modal = document.getElementById('terminalModal');
     if (modal) modal.classList.add('hidden');
     const modalExportBtn = document.getElementById('modalExportBtn');
     if (modalExportBtn) modalExportBtn.classList.add('hidden');
-    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM', 'OMON', 'MAPS', 'AI', 'INSD', 'HDS', 'LANG'];
+    const modalFunctions = ['DES', 'HELP', 'ECO', 'ANR', 'FA', 'RV', 'EE', 'WIRP', 'WCRS', 'FDM', 'OMON', 'MAPS', 'AI', 'INSD', 'HDS', 'LANG', 'POLY'];
     if (modalFunctions.includes(this.currentFunction)) {
       this.setFunction('GP');
     }
@@ -2396,13 +2565,15 @@ class TerminalController {
       const numChg = Number(idx.change || 0);
       const isPos = numChg >= 0;
       const cls = isPos ? 'pos' : 'neg';
+      const safeSym = this.escapeHtml(idx.symbol);
+      const safeName = this.escapeHtml(idx.name || idx.symbol);
       html += `
-        <tr id="row-${idx.symbol}" data-symbol="${idx.symbol}">
-          <td><strong>${idx.symbol}</strong></td>
-          <td class="neu">${idx.name || idx.symbol}</td>
-          <td class="text-right" id="price-${idx.symbol}">${this.fmtNum(idx.price, 2)}</td>
-          <td class="text-right ${cls}" id="chg-${idx.symbol}">${this.fmtNum(numChg, 2)}</td>
-          <td class="text-right ${cls}" id="pct-${idx.symbol}">${this.fmtPct(idx.change_pct, 2)}</td>
+        <tr id="row-${safeSym}" data-symbol="${safeSym}">
+          <td><strong>${safeSym}</strong></td>
+          <td class="neu">${safeName}</td>
+          <td class="text-right" id="price-${safeSym}">${this.fmtNum(idx.price, 2)}</td>
+          <td class="text-right ${cls}" id="chg-${safeSym}">${this.fmtNum(numChg, 2)}</td>
+          <td class="text-right ${cls}" id="pct-${safeSym}">${this.fmtPct(idx.change_pct, 2)}</td>
         </tr>
       `;
     });
@@ -2445,12 +2616,13 @@ class TerminalController {
     let html = '';
     newsItems.forEach(n => {
       const sentClass = n.sentiment === 'BULLISH' ? 'pos' : (n.sentiment === 'BEARISH' ? 'neg' : 'neu');
+      const safeTicker = this.escapeHtml(n.ticker);
       html += `
-        <div class="news-item" style="cursor: pointer;" data-ticker="${n.ticker}" title="Click to load ${n.ticker}">
-          <div class="news-time">${n.time}</div>
-          <div class="news-ticker">${n.ticker}</div>
-          <div class="news-headline">${n.headline}</div>
-          <div class="news-tag ${sentClass}">${n.source}</div>
+        <div class="news-item" style="cursor: pointer;" data-ticker="${safeTicker}" title="Click to load ${safeTicker}">
+          <div class="news-time">${this.escapeHtml(n.time)}</div>
+          <div class="news-ticker">${safeTicker}</div>
+          <div class="news-headline">${this.escapeHtml(n.headline)}</div>
+          <div class="news-tag ${sentClass}">${this.escapeHtml(n.source)}</div>
         </div>
       `;
     });
@@ -2472,7 +2644,7 @@ class TerminalController {
     if (!container || !curve) return;
     let html = `
       <div style="font-size: 11px; margin-bottom: 6px;">
-        <span>2Y/10Y SPREAD: <strong class="${curve.inverted ? 'neg' : 'pos'}">${curve.spread_2_10_bps != null ? curve.spread_2_10_bps : 'N/A'} BPS</strong></span>
+        <span>2Y/10Y SPREAD: <strong class="${curve.inverted ? 'neg' : 'pos'}">${this.escapeHtml(curve.spread_2_10_bps != null ? curve.spread_2_10_bps : 'N/A')} BPS</strong></span>
         ${curve.inverted ? '<span class="neg" style="margin-left: 8px;">[INVERTED]</span>' : ''}
       </div>
       <table class="terminal-table">
@@ -2486,7 +2658,7 @@ class TerminalController {
       const cls = numChg >= 0 ? 'pos' : 'neg';
       html += `
         <tr>
-          <td>${t.tenor}</td>
+          <td>${this.escapeHtml(t.tenor)}</td>
           <td class="text-right"><strong>${this.fmtPct(t.yield, 2, false)}</strong></td>
           <td class="text-right ${cls}">${this.fmtNum(numChg, 2)}</td>
         </tr>

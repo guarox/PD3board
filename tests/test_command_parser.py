@@ -10,7 +10,7 @@ def test_parse_ticker_sector_function_go():
     assert res["function"] == "GP"
 
 def test_parse_standalone_function():
-    for fn in ["WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM", "OMON", "MAPS", "AI", "INSD", "HDS"]:
+    for fn in ["WEI", "TOP", "YCRV", "ECO", "HELP", "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM", "OMON", "MAPS", "AI", "INSD", "HDS", "POLY"]:
         res = CommandParser.parse(f"{fn} <GO>")
         assert res["valid"] is True
         assert res["function"] == fn
@@ -25,6 +25,14 @@ def test_parse_aliases():
     assert res_res["valid"] is True
     assert res_res["function"] == "AI"
 
+    res_pred = CommandParser.parse("PRED <GO>")
+    assert res_pred["valid"] is True
+    assert res_pred["function"] == "POLY"
+
+    res_pm = CommandParser.parse("MACRO PM <GO>")
+    assert res_pm["valid"] is True
+    assert res_pm["ticker"] == "MACRO"
+    assert res_pm["function"] == "POLY"
 def test_parse_inferred_sector():
     res_crypto = CommandParser.parse("BTCUSDT L2 <GO>")
     assert res_crypto["valid"] is True
@@ -40,3 +48,21 @@ def test_parse_inferred_sector():
 def test_empty_command():
     res = CommandParser.parse("")
     assert res["valid"] is False
+
+def test_reject_invalid_and_xss_tickers():
+    malicious_inputs = [
+        "<script>alert(1)</script> GP <GO>",
+        "DES <img/src=x/onerror=alert(1)>",
+        "AAPL\"onload=\"alert(1) EQUITY GP",
+        "THIS_TICKER_IS_WAY_TOO_LONG_FOR_A_SYMBOL GP",
+    ]
+    for bad_cmd in malicious_inputs:
+        res = CommandParser.parse(bad_cmd)
+        assert res["valid"] is False, f"Expected malicious/invalid command to be rejected: {bad_cmd}"
+
+def test_valid_special_symbol_formats():
+    for sym in ["BRK.B", "^GSPC", "EURUSD=X", "BTC-USD", "US10Y"]:
+        res = CommandParser.parse(f"{sym} GP <GO>")
+        assert res["valid"] is True
+        assert res["ticker"] == sym
+

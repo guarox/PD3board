@@ -25,3 +25,39 @@ def test_orderbook_sorting_and_totals():
     assert snapshot["asks"][0]["price"] == 60150.0
     assert snapshot["asks"][1]["price"] == 60200.0
     assert snapshot["asks"][2]["price"] == 60300.0
+
+
+def test_thread_safe_orderbook_and_tick_buffer():
+    import threading
+    from app.engine.tick_buffer import TickBuffer
+
+    ob = OrderBook("BTCUSDT", max_depth=10)
+    tb = TickBuffer("BTCUSDT", max_ticks=500)
+    errors = []
+
+    def writer():
+        try:
+            for i in range(200):
+                p = 60000.0 + (i % 50)
+                tb.add_tick(price=p, size=1.25, side="buy", timestamp=1700000000.0 + i * 15)
+                ob.update_levels([[p - 1.0, 1.0], [p - 2.0, 2.0]], [[p + 1.0, 1.5], [p + 2.0, 2.5]], update_id=i)
+        except Exception as e:
+            errors.append(e)
+
+    def reader():
+        try:
+            for _ in range(200):
+                _ = tb.get_candles(limit=100)
+                _ = tb.get_recent_ticks(count=20)
+                _ = ob.get_snapshot()
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=writer) for _ in range(3)] + [threading.Thread(target=reader) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == [], f"Thread-safety errors encountered: {errors}"
+

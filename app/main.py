@@ -1,16 +1,17 @@
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
+import threading
 import time
-from typing import Set, Dict, Any
+from typing import Set, Dict, Any, List
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
 from app.config import Config
 from app.engine.command_parser import CommandParser
 from app.engine.orderbook import OrderBook
@@ -26,20 +27,51 @@ from app.feeds.options import OptionsFeed
 from app.feeds.market_heatmap import MarketHeatmapFeed
 from app.feeds.insider_holdings import InsiderHoldingsFeed
 from app.feeds.ai_research import AIResearchFeed
+from app.feeds.polymarket import PolymarketFeed
+from app.feeds.market_data_client import market_data_client
 from app.models.contracts import normalize_contract_payload
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("pd3board")
 
-app = FastAPI(title="PD3board Financial Workstation", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await startup_event()
+    try:
+        yield
+    finally:
+        await shutdown_event()
+
+
+def _read_app_version() -> str:
+    ver_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
+    try:
+        with open(ver_file, "r", encoding="utf-8") as f:
+            return f.read().strip() or "1.2.0"
+    except Exception:
+        return "1.2.0"
+
+
+APP_VERSION = _read_app_version()
+app = FastAPI(title="PD3board Financial Workstation", version=APP_VERSION, lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.environ.get("CORS_ALLOW_ORIGINS", "https://pd3board.gilbertopina.com,https://pd3board.home.gilbertopina.com,http://localhost:8000").split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def static_cache_coherency_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    return response
 
 # Global Feeds
 equities_feed = EquitiesFeed()
@@ -51,6 +83,11 @@ options_feed = OptionsFeed()
 market_heatmap_feed = MarketHeatmapFeed()
 insider_holdings_feed = InsiderHoldingsFeed()
 ai_research_feed = AIResearchFeed()
+polymarket_feed = PolymarketFeed()
+
+MAX_TRACKED_SYMBOLS = 256
+_state_lock = threading.RLock()
+_background_tasks: List[asyncio.Task] = []
 
 # Global In-Memory State
 orderbooks: Dict[str, OrderBook] = {
@@ -60,17 +97,26 @@ tick_buffers: Dict[str, TickBuffer] = {
     Config.DEFAULT_CRYPTO: TickBuffer(Config.DEFAULT_CRYPTO),
 }
 
+def _evict_if_needed(store: Dict[str, Any], max_size: int = MAX_TRACKED_SYMBOLS):
+    with _state_lock:
+        while len(store) >= max_size:
+            oldest_key = next((k for k in store if k != Config.DEFAULT_CRYPTO), next(iter(store)))
+            store.pop(oldest_key, None)
+
 def sync_tick_buffer_with_real_candles(sym: str) -> TickBuffer:
     sym = sym.upper()
-    if sym in tick_buffers:
-        tb = tick_buffers[sym]
-    else:
-        tb = TickBuffer(sym)
-        tick_buffers[sym] = tb
+    with _state_lock:
+        if sym in tick_buffers:
+            tb = tick_buffers[sym]
+        else:
+            _evict_if_needed(tick_buffers, MAX_TRACKED_SYMBOLS)
+            tb = TickBuffer(sym)
+            tick_buffers[sym] = tb
 
     # Attempt to load real historical 1-minute intraday candles from upstream (e.g. Yahoo Finance)
     real_candles = equities_feed.get_historical_candles(sym)
     if real_candles:
+        candle_objs = []
         for c in real_candles:
             b_time = (int(c["time"]) // 60) * 60
             c_open = float(c["open"])
@@ -79,32 +125,33 @@ def sync_tick_buffer_with_real_candles(sym: str) -> TickBuffer:
             c_low = min(float(c["low"]), c_open, c_close)
             c_vol = max(1.0, float(c.get("volume", 10.0)))
 
-            tb.candles[b_time] = Candle(
-                time=b_time,
-                open=c_open,
-                high=c_high,
-                low=c_low,
-                close=c_close,
-                volume=c_vol
+            candle_objs.append(
+                Candle(
+                    time=b_time,
+                    open=c_open,
+                    high=c_high,
+                    low=c_low,
+                    close=c_close,
+                    volume=c_vol
+                )
             )
-        # Circular prune if exceeding 3000 bars
-        if len(tb.candles) > 3000:
-            oldest_keys = sorted(tb.candles.keys())[:-2500]
-            for old_k in oldest_keys:
-                del tb.candles[old_k]
+        tb.upsert_candles(candle_objs, max_candles=3000)
 
     return tb
 
 def get_or_create_tick_buffer(sym: str) -> TickBuffer:
     sym = sym.upper()
-    if sym in tick_buffers:
-        tb = tick_buffers[sym]
-        if tb.candles:
-            return tb
+    with _state_lock:
+        tb = tick_buffers.get(sym)
+    if tb is not None:
+        with tb._lock:
+            if len(tb.candles) >= 5:
+                return tb
 
     tb = sync_tick_buffer_with_real_candles(sym)
-    if tb.candles:
-        return tb
+    with tb._lock:
+        if len(tb.candles) >= 5:
+            return tb
 
     # Fallback to generating natural simulated historical candles around current security price
     expected_price = equities_feed.get_security_price(sym, prefer_live=True)
@@ -150,31 +197,35 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
         candles_list.append((minute_ts, c_open, c_high, c_low, c_close, c_vol))
         curr = next_val
 
-    for minute_ts, c_open, c_high, c_low, c_close, c_vol in candles_list:
-        tb.candles[minute_ts] = Candle(
-            time=minute_ts,
-            open=c_open,
-            high=c_high,
-            low=c_low,
-            close=c_close,
-            volume=c_vol
-        )
-        tb.ticks.append(Tick(timestamp=minute_ts + 10, price=c_open, size=round(c_vol * 0.25, 1), side="buy"))
-        tb.ticks.append(Tick(timestamp=minute_ts + 25, price=c_high, size=round(c_vol * 0.25, 1), side="buy"))
-        tb.ticks.append(Tick(timestamp=minute_ts + 40, price=c_low, size=round(c_vol * 0.25, 1), side="sell"))
-        tb.ticks.append(Tick(timestamp=minute_ts + 55, price=c_close, size=round(c_vol * 0.25, 1), side="buy" if c_close >= c_open else "sell"))
+    with tb._lock:
+        for minute_ts, c_open, c_high, c_low, c_close, c_vol in candles_list:
+            tb.candles[minute_ts] = Candle(
+                time=minute_ts,
+                open=c_open,
+                high=c_high,
+                low=c_low,
+                close=c_close,
+                volume=c_vol
+            )
+            tb.ticks.append(Tick(timestamp=minute_ts + 10, price=c_open, size=round(c_vol * 0.25, 1), side="buy"))
+            tb.ticks.append(Tick(timestamp=minute_ts + 25, price=c_high, size=round(c_vol * 0.25, 1), side="buy"))
+            tb.ticks.append(Tick(timestamp=minute_ts + 40, price=c_low, size=round(c_vol * 0.25, 1), side="sell"))
+            tb.ticks.append(Tick(timestamp=minute_ts + 55, price=c_close, size=round(c_vol * 0.25, 1), side="buy" if c_close >= c_open else "sell"))
 
     return tb
 
 def get_or_create_orderbook(sym: str) -> OrderBook:
     sym = sym.upper()
-    if sym == Config.DEFAULT_CRYPTO and sym in orderbooks and orderbooks[sym].bids:
-        return orderbooks[sym]
+    with _state_lock:
+        if sym == Config.DEFAULT_CRYPTO and sym in orderbooks and orderbooks[sym].bids:
+            return orderbooks[sym]
 
-    if sym not in orderbooks or not orderbooks[sym].bids:
-        orderbooks[sym] = OrderBook(sym)
+        if sym not in orderbooks or not orderbooks[sym].bids:
+            if sym not in orderbooks:
+                _evict_if_needed(orderbooks, MAX_TRACKED_SYMBOLS)
+            orderbooks[sym] = OrderBook(sym)
 
-    ob = orderbooks[sym]
+        ob = orderbooks[sym]
     if not ob.bids or sym != Config.DEFAULT_CRYPTO:
         price = equities_feed.get_security_price(sym, prefer_live=True)
         if price >= 10000:
@@ -220,18 +271,21 @@ async def broadcast(message: Dict[str, Any]):
     if not active_connections:
         return
     payload = json.dumps(message)
-    dead_connections = set()
-    for ws in list(active_connections):
-        try:
-            await ws.send_text(payload)
-        except Exception:
-            dead_connections.add(ws)
+    clients = list(active_connections)
+    results = await asyncio.gather(
+        *(asyncio.wait_for(ws.send_text(payload), timeout=2.0) for ws in clients),
+        return_exceptions=True,
+    )
+    dead_connections = {ws for ws, res in zip(clients, results) if isinstance(res, Exception)}
     active_connections.difference_update(dead_connections)
 
 async def on_binance_tick(symbol: str, price: float, size: float, side: str):
-    if symbol not in tick_buffers:
-        tick_buffers[symbol] = TickBuffer(symbol)
-    tick = tick_buffers[symbol].add_tick(price, size, side)
+    with _state_lock:
+        if symbol not in tick_buffers:
+            _evict_if_needed(tick_buffers, MAX_TRACKED_SYMBOLS)
+            tick_buffers[symbol] = TickBuffer(symbol)
+        tb = tick_buffers[symbol]
+    tick = tb.add_tick(price, size, side)
     await broadcast({
         "type": "tick",
         "symbol": symbol,
@@ -242,9 +296,11 @@ async def on_binance_tick(symbol: str, price: float, size: float, side: str):
     })
 
 async def on_binance_depth(symbol: str, bids: list, asks: list, update_id: int):
-    if symbol not in orderbooks:
-        orderbooks[symbol] = OrderBook(symbol)
-    ob = orderbooks[symbol]
+    with _state_lock:
+        if symbol not in orderbooks:
+            _evict_if_needed(orderbooks, MAX_TRACKED_SYMBOLS)
+            orderbooks[symbol] = OrderBook(symbol)
+        ob = orderbooks[symbol]
     ob.update_levels(bids, asks, update_id)
     await broadcast({
         "type": "depth",
@@ -282,7 +338,7 @@ async def equities_broadcaster():
                     "data": await yield_curve_feed.get_curve_async()
                 })
 
-            updates = equities_feed.update_ticks()
+            updates = await asyncio.to_thread(equities_feed.update_ticks)
             if updates:
                 await broadcast({
                     "type": "equities_update",
@@ -293,8 +349,10 @@ async def equities_broadcaster():
                     sym = item["symbol"]
                     price = item["price"]
                     chg = item["change"]
-                    if sym in tick_buffers and sym.upper() not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
-                        tick = tick_buffers[sym].add_tick(
+                    with _state_lock:
+                        tb = tick_buffers.get(sym)
+                    if tb is not None and sym.upper() not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
+                        tick = tb.add_tick(
                             price=price,
                             size=round(50.0 + (hash(f"{sym}_{price}") % 50), 1),
                             side="buy" if chg >= 0 else "sell"
@@ -307,8 +365,9 @@ async def equities_broadcaster():
                             "side": "buy" if chg >= 0 else "sell",
                             "timestamp": tick.timestamp
                         })
-                    if sym in orderbooks and sym != Config.DEFAULT_CRYPTO:
-                        ob = orderbooks[sym]
+                    with _state_lock:
+                        ob = orderbooks.get(sym)
+                    if ob is not None and sym != Config.DEFAULT_CRYPTO:
                         tick = 0.50 if price >= 10000 else (0.25 if price >= 1000 else (0.05 if price >= 100 else 0.01))
                         raw_bids = []
                         raw_asks = []
@@ -323,6 +382,8 @@ async def equities_broadcaster():
                             "symbol": sym,
                             "data": ob.get_snapshot()
                         })
+        except asyncio.CancelledError:
+            break
         except Exception as e:
             logger.error(f"Error in equities broadcaster: {e}")
         await asyncio.sleep(1.0)
@@ -336,6 +397,8 @@ async def news_broadcaster():
                 "type": "news",
                 "data": news_feed.get_latest_news()
             })
+    except asyncio.CancelledError:
+        return
     except Exception as e:
         logger.error(f"Initial live news fetch error: {e}")
 
@@ -348,45 +411,61 @@ async def news_broadcaster():
                     "type": "news",
                     "data": news_feed.get_latest_news()
                 })
+        except asyncio.CancelledError:
+            break
         except Exception as e:
             logger.error(f"Error in news broadcaster loop: {e}")
 
-@app.on_event("startup")
 async def startup_event():
     logger.info("Starting PD3board feeds...")
-    for sym in list(equities_feed.equities.keys()) + list(equities_feed.indices.keys()):
-        get_or_create_tick_buffer(sym)
-        get_or_create_orderbook(sym)
 
     # Start Coinbase live feed (Binance passive in US IP environment)
     await coinbase_feed.start()
 
-    # Pre-populate crypto tick buffers with historical candles from Coinbase REST
+    # Pre-populate equity and crypto tick buffers in the background so Uvicorn binds :8000 immediately
     async def bootstrap_crypto():
+        def _warm_equities():
+            for sym in list(equities_feed.equities.keys()) + list(equities_feed.indices.keys()):
+                get_or_create_tick_buffer(sym)
+                get_or_create_orderbook(sym)
+
+        await asyncio.to_thread(_warm_equities)
         for prod in ["BTC-USD", "ETH-USD", "SOL-USD"]:
             candles = await coinbase_feed.fetch_historical_candles(prod, granularity=60)
             if candles:
                 sym_base = prod.split("-")[0]
                 for target_sym in [prod.replace("-", ""), f"{sym_base}USDT", sym_base]:
                     tb = get_or_create_tick_buffer(target_sym)
-                    for c in candles:
-                        b_time = (int(c["time"]) // 60) * 60
-                        tb.candles[b_time] = Candle(
-                            time=b_time,
+                    candle_objs = [
+                        Candle(
+                            time=(int(c["time"]) // 60) * 60,
                             open=float(c["open"]),
                             high=float(c["high"]),
                             low=float(c["low"]),
                             close=float(c["close"]),
                             volume=float(c["volume"])
                         )
-    asyncio.create_task(bootstrap_crypto())
-    asyncio.create_task(equities_broadcaster())
-    asyncio.create_task(news_broadcaster())
+                        for c in candles
+                    ]
+                    tb.upsert_candles(candle_objs)
 
-@app.on_event("shutdown")
+    _background_tasks.clear()
+    _background_tasks.extend([
+        asyncio.create_task(bootstrap_crypto()),
+        asyncio.create_task(equities_broadcaster()),
+        asyncio.create_task(news_broadcaster()),
+    ])
+
 async def shutdown_event():
     logger.info("Stopping PD3board feeds...")
+    for task in list(_background_tasks):
+        if not task.done():
+            task.cancel()
+    if _background_tasks:
+        await asyncio.gather(*_background_tasks, return_exceptions=True)
+        _background_tasks.clear()
     await coinbase_feed.stop()
+    await market_data_client.close()
 
 
 # Static Files
@@ -398,7 +477,7 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 async def get_index():
     index_file = os.path.join(static_dir, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        return FileResponse(index_file, headers={"Cache-Control": "no-cache, must-revalidate"})
     return JSONResponse({"status": "PD3board API Running", "ui": "Compiling static bundle..."})
 
 @app.get("/health")
@@ -409,6 +488,9 @@ async def health_check():
         "connections": len(active_connections),
         "timestamp": time.time()
     }
+@app.get("/VERSION", response_class=PlainTextResponse)
+async def get_version():
+    return APP_VERSION
 
 @app.post("/api/command")
 async def execute_command(req: CommandRequest):
@@ -421,7 +503,7 @@ async def execute_command(req: CommandRequest):
 
     data: Dict[str, Any] = {}
     if fn in {"GP", "GIP"}:
-        tb = get_or_create_tick_buffer(ticker)
+        tb = await asyncio.to_thread(get_or_create_tick_buffer, ticker)
         data = {
             "symbol": ticker,
             "interval": "1M",
@@ -429,7 +511,7 @@ async def execute_command(req: CommandRequest):
             "ticks": tb.get_recent_ticks()
         }
     elif fn == "L2":
-        ob = get_or_create_orderbook(ticker)
+        ob = await asyncio.to_thread(get_or_create_orderbook, ticker)
         data = ob.get_snapshot() if ob else {}
     elif fn == "WEI":
         data = {"indices": await equities_feed.get_wei_matrix_async()}
@@ -467,6 +549,9 @@ async def execute_command(req: CommandRequest):
         data = await ai_research_feed.generate_research_memo_async(ticker)
     elif fn in {"LANG", "TRACE"}:
         data = ai_research_feed.get_langfuse_telemetry()
+    elif fn in {"POLY", "PRED", "PM"}:
+        query_filter = parsed["ticker"]
+        data = await polymarket_feed.get_markets_async(query=query_filter)
     elif fn == "HELP":
         data = {
             "help": [
@@ -489,7 +574,8 @@ async def execute_command(req: CommandRequest):
                 {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
                 {"mnemonic": "TOP", "desc": "Top Financial Market News Wire with Ticker Tagging"},
                 {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve (1M to 30Y)"},
-                {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"}
+                {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"},
+                {"mnemonic": "POLY", "desc": "Polymarket Prediction Markets & Binary Event Contracts (CLOB)"}
             ]
         }
 
@@ -584,6 +670,11 @@ async def get_research(symbol: str):
 async def get_langfuse_stats():
     return ai_research_feed.get_langfuse_telemetry()
 
+@app.get("/api/polymarket")
+async def get_polymarket(q: str = ""):
+    res = await polymarket_feed.get_markets_async(query=q or None)
+    return normalize_contract_payload("POLY", res)
+
 @app.get("/api/help")
 async def get_help():
     return {
@@ -607,7 +698,8 @@ async def get_help():
             {"mnemonic": "FDM", "desc": "Global Commodities & Energy Matrix (Oil, Gold, Copper, etc.)"},
             {"mnemonic": "TOP", "desc": "Top Financial Market News Wire with Ticker Tagging"},
             {"mnemonic": "YCRV", "desc": "US Treasury Benchmark Yield Curve (1M to 30Y)"},
-            {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"}
+            {"mnemonic": "ECO", "desc": "Economic Calendar & Global Macroeconomic Indicators"},
+            {"mnemonic": "POLY", "desc": "Polymarket Prediction Markets & Binary Event Contracts (CLOB)"}
         ],
         "sectors": ["EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"],
         "shortcuts": [
@@ -622,7 +714,7 @@ async def get_help():
 @app.get("/api/orderbook/{symbol}")
 async def get_orderbook(symbol: str):
     sym = symbol.upper()
-    ob = get_or_create_orderbook(sym)
+    ob = await asyncio.to_thread(get_or_create_orderbook, sym)
     return ob.get_snapshot() if ob else {}
 
 @app.get("/api/market-status")
@@ -641,10 +733,10 @@ async def get_ticks(symbol: str, interval: str = "1M"):
     if norm_interval not in {"1M", "5M", "15M", "1H", "1D"}:
         norm_interval = "1M"
 
-    tb = get_or_create_tick_buffer(sym)
+    tb = await asyncio.to_thread(get_or_create_tick_buffer, sym)
     if norm_interval == "1M":
         if sym not in ("BTC", "ETH", "SOL", "BTCUSD", "BTCUSDT", "ETHUSD", "ETHUSDT", "SOLUSD", "SOLUSDT"):
-            sync_tick_buffer_with_real_candles(sym)
+            await asyncio.to_thread(sync_tick_buffer_with_real_candles, sym)
         return {
             "symbol": sym,
             "interval": "1M",
@@ -653,7 +745,7 @@ async def get_ticks(symbol: str, interval: str = "1M"):
         }
 
     # For multi-timeframe intervals (5M, 15M, 1H, 1D), fetch historical candles
-    candles = equities_feed.fetch_historical_candles(sym, norm_interval)
+    candles = await asyncio.to_thread(equities_feed.fetch_historical_candles, sym, norm_interval)
     return {
         "symbol": sym,
         "interval": norm_interval,
@@ -674,7 +766,8 @@ async def websocket_endpoint(websocket: WebSocket):
             "terminal_id": term_id.upper()
         }))
 
-        ob = orderbooks.get(Config.DEFAULT_CRYPTO)
+        with _state_lock:
+            ob = orderbooks.get(Config.DEFAULT_CRYPTO)
         if ob:
             await websocket.send_text(json.dumps({
                 "type": "depth",

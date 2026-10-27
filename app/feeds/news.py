@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional, Set
 import xml.etree.ElementTree as ET
 
 import aiohttp
+from app.feeds.market_data_client import market_data_client, safe_parse_xml
 
 try:
     import zoneinfo
@@ -162,7 +163,7 @@ class NewsFeed:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=7)) as resp:
                 if resp.status == 200:
                     raw_xml = await resp.text()
-                    root = ET.fromstring(raw_xml)
+                    root = safe_parse_xml(raw_xml)
                     for node in root.findall(".//item"):
                         title_el = node.find("title")
                         date_el = node.find("pubDate")
@@ -214,46 +215,41 @@ class NewsFeed:
         Poll live RSS feeds concurrently, deduplicate, and update the wire cache.
         Returns newly added headline objects.
         """
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "application/rss+xml, application/xml, text/xml; q=0.9, */*; q=0.8"
-        }
-
         new_items: List[Dict[str, Any]] = []
         try:
-            async with aiohttp.ClientSession(headers=headers) as session:
-                tasks = [self._fetch_single_feed(session, src, url) for src, url in RSS_FEEDS]
-                results = await asyncio.gather(*tasks, return_exceptions=True)
+            session = await market_data_client.get_session()
+            tasks = [self._fetch_single_feed(session, src, url) for src, url in RSS_FEEDS]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                fetched: List[Dict[str, Any]] = []
-                for res in results:
-                    if isinstance(res, list):
-                        fetched.extend(res)
+            fetched: List[Dict[str, Any]] = []
+            for res in results:
+                if isinstance(res, list):
+                    fetched.extend(res)
 
-                if fetched:
-                    # Sort fetched headlines newest first
-                    fetched.sort(key=lambda x: x["epoch"], reverse=True)
+            if fetched:
+                # Sort fetched headlines newest first
+                fetched.sort(key=lambda x: x["epoch"], reverse=True)
 
-                    for item in fetched:
-                        h_key = item["headline"]
-                        if h_key not in self._seen_headlines:
-                            self._seen_headlines.add(h_key)
-                            new_items.append(item)
+                for item in fetched:
+                    h_key = item["headline"]
+                    if h_key not in self._seen_headlines:
+                        self._seen_headlines.add(h_key)
+                        new_items.append(item)
 
-                    if new_items:
-                        # Combine new items with existing headlines and maintain max 50 items
-                        combined = new_items + self.headlines
-                        # Deduplicate while preserving order
-                        seen = set()
-                        deduped = []
-                        for h in combined:
-                            if h["headline"] not in seen:
-                                seen.add(h["headline"])
-                                deduped.append(h)
-                        self.headlines = deduped[:50]
-                        logger.info(f"News wire updated with {len(new_items)} new live headlines")
-                    elif not self.headlines and fetched:
-                        self.headlines = fetched[:50]
+                if new_items:
+                    # Combine new items with existing headlines and maintain max 50 items
+                    combined = new_items + self.headlines
+                    # Deduplicate while preserving order
+                    seen = set()
+                    deduped = []
+                    for h in combined:
+                        if h["headline"] not in seen:
+                            seen.add(h["headline"])
+                            deduped.append(h)
+                    self.headlines = deduped[:50]
+                    logger.info(f"News wire updated with {len(new_items)} new live headlines")
+                elif not self.headlines and fetched:
+                    self.headlines = fetched[:50]
 
             self.last_refresh = time.time()
         except Exception as e:

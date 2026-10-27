@@ -8,6 +8,15 @@ import aiohttp
 
 logger = logging.getLogger(__name__)
 
+
+def safe_parse_xml(xml_text: str) -> ET.Element:
+    """Parse XML string while rejecting DTD/ENTITY declarations to prevent XXE/Billion Laughs."""
+    upper_head = xml_text[:4096].upper()
+    if "<!DOCTYPE" in upper_head or "<!ENTITY" in upper_head:
+        raise ValueError("Unsafe XML declaration (DOCTYPE/ENTITY) rejected")
+    return ET.fromstring(xml_text)
+
+
 GLOBAL_SYMBOL_MAP: Dict[str, str] = {
     # Equity Indices
     "SPX": "^GSPC",
@@ -126,7 +135,7 @@ class MarketDataClient:
             or self._session.closed
             or (current_loop and getattr(self._session, "_loop", None) != current_loop)
         ):
-            connector = aiohttp.TCPConnector(family=socket.AF_INET, ssl=False)
+            connector = aiohttp.TCPConnector(family=socket.AF_INET, ssl=True)
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
                 "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -149,6 +158,10 @@ class MarketDataClient:
     def _set_cache(self, key: str, value: Any, ttl_seconds: float):
         self._cache[key] = value
         self._cache_ttl[key] = time.time() + ttl_seconds
+        while len(self._cache) > 512:
+            oldest_key = min(self._cache_ttl, key=self._cache_ttl.get) if self._cache_ttl else next(iter(self._cache))
+            self._cache.pop(oldest_key, None)
+            self._cache_ttl.pop(oldest_key, None)
 
     async def get_yahoo_crumb(self) -> Optional[str]:
         now = time.time()
@@ -593,7 +606,7 @@ class MarketDataClient:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as r:
                 if r.status == 200:
                     xml_text = await r.text()
-                    root = ET.fromstring(xml_text)
+                    root = safe_parse_xml(xml_text)
                     items = root.findall(".//item")
                     headlines = []
                     for it in items[:20]:
@@ -635,7 +648,7 @@ class MarketDataClient:
             async with session.get(g_url, timeout=aiohttp.ClientTimeout(total=6)) as r:
                 if r.status == 200:
                     xml_text = await r.text()
-                    root = ET.fromstring(xml_text)
+                    root = safe_parse_xml(xml_text)
                     items = root.findall(".//item")
                     headlines = []
                     for it in items[:20]:

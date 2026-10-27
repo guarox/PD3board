@@ -793,7 +793,7 @@ class EquitiesFeed:
                                     "volume": round(float(v), 1)
                                 })
 
-                    if candles:
+                    if len(candles) >= 5:
                         self.historical_cache[cache_key] = {
                             "candles": candles,
                             "expires": now + cache_ttl
@@ -1909,15 +1909,17 @@ class EquitiesFeed:
                 ]
 
                 # Balance Sheet
+                bal_list = list(reversed(bal_history)) if bal_history else []
                 cash_vals, ppe_vals, asset_vals, debt_vals, liab_vals, eq_vals = [], [], [], [], [], []
                 for i in range(n_years):
                     scale = 0.82 + (0.06 * i)
-                    c = total_cash * scale
-                    d = total_debt * scale
-                    eq = (total_debt / debt_to_eq) * scale
-                    liab = d * 1.35
-                    tot_assets = eq + liab
-                    ppe = tot_assets * 0.35
+                    b_stmt = bal_list[i] if i < len(bal_list) else {}
+                    c = b_stmt.get("cash", {}).get("raw") or (total_cash * scale)
+                    d = b_stmt.get("longTermDebt", {}).get("raw") or b_stmt.get("shortLongTermDebt", {}).get("raw") or (total_debt * scale)
+                    eq = b_stmt.get("totalStockholderEquity", {}).get("raw") or ((total_debt / debt_to_eq) * scale)
+                    liab = b_stmt.get("totalLiab", {}).get("raw") or (d * 1.35)
+                    tot_assets = b_stmt.get("totalAssets", {}).get("raw") or (eq + liab)
+                    ppe = b_stmt.get("propertyPlantEquipment", {}).get("raw") or (tot_assets * 0.35)
 
                     cash_vals.append(fmt_num(c))
                     ppe_vals.append(fmt_num(ppe))
@@ -1936,14 +1938,17 @@ class EquitiesFeed:
                 ]
 
                 # Cash Flow
+                cf_list = list(reversed(cf_history)) if cf_history else []
                 ocf_vals, capex_vals, fcf_vals, div_vals = [], [], [], []
                 for i, h in enumerate(inc_list):
                     scale = 0.80 + (0.07 * i)
-                    o = op_cf * scale
-                    f = free_cf * scale
-                    capex = -(o - f)
+                    c_stmt = cf_list[i] if i < len(cf_list) else {}
+                    o = c_stmt.get("totalCashFromOperatingActivities", {}).get("raw") or (op_cf * scale)
+                    raw_capex = c_stmt.get("capitalExpenditures", {}).get("raw")
+                    f = (o + raw_capex) if raw_capex is not None else (free_cf * scale)
+                    capex = raw_capex if raw_capex is not None else -(o - f)
                     ni = h.get("netIncome", {}).get("raw", 0)
-                    divs = -(abs(ni) * 0.15) if ni else -(f * 0.20)
+                    divs = c_stmt.get("dividendsPaid", {}).get("raw") or (-(abs(ni) * 0.15) if ni else -(f * 0.20))
 
                     ocf_vals.append(fmt_num(o))
                     capex_vals.append(fmt_num(capex))

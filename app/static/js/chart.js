@@ -134,10 +134,12 @@ class PriceChart {
   updateHud(bar) {
     if (!this.hudElement) return;
     const targetBar = bar || (this.candles.length ? this.candles[this.candles.length - 1] : null);
+    const safeSym = window.escapeHtml ? window.escapeHtml(this.symbol) : this.symbol;
+    const safeInt = window.escapeHtml ? window.escapeHtml(this.interval) : this.interval;
 
     if (!targetBar) {
       this.hudElement.innerHTML = `
-        <span class="hud-symbol">${this.symbol} [${this.interval}]</span>
+        <span class="hud-symbol">${safeSym} [${safeInt}]</span>
         <span>TIME: <span class="hud-val">--</span></span>
         <span>O: <span class="hud-val">--</span></span>
         <span>H: <span class="hud-val">--</span></span>
@@ -184,7 +186,7 @@ class PriceChart {
     };
 
     this.hudElement.innerHTML = `
-      <span class="hud-symbol">${this.symbol} [${this.interval}]</span>
+      <span class="hud-symbol">${safeSym} [${safeInt}]</span>
       <span>TIME: <span class="hud-val">${timeStr}</span></span>
       <span>O: <span class="hud-val">${fmt(open)}</span></span>
       <span>H: <span class="hud-val">${fmt(high)}</span></span>

@@ -5,6 +5,7 @@ import random
 import time
 from typing import Callable, Optional, List, Dict, Any
 import websockets
+from app.feeds.market_data_client import market_data_client
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ class CoinbaseFeed:
             "ETH-USD": 2400.00,
             "SOL-USD": 98.00
         }
+        self._last_depth_ts: Dict[str, float] = {}
 
     async def fetch_historical_candles(self, product_id: str = "BTC-USD", granularity: int = 60) -> List[Dict[str, Any]]:
         """
@@ -48,24 +50,24 @@ class CoinbaseFeed:
         url = f"https://api.exchange.coinbase.com/products/{product_id}/candles?granularity={granularity}"
         headers = {"User-Agent": "Mozilla/5.0"}
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=4.0)) as resp:
-                    if resp.status == 200:
-                        raw = await resp.json()
-                        # Coinbase returns newest first: [ [ time, low, high, open, close, volume ], ... ]
-                        candles = []
-                        for row in reversed(raw):
-                            if len(row) >= 6:
-                                ts, low, high, open_, close_, vol = row[0], row[1], row[2], row[3], row[4], row[5]
-                                candles.append({
-                                    "time": int(ts),
-                                    "open": float(open_),
-                                    "high": float(high),
-                                    "low": float(low),
-                                    "close": float(close_),
-                                    "volume": round(float(vol), 4)
-                                })
-                        return candles
+            session = await market_data_client.get_session()
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=4.0)) as resp:
+                if resp.status == 200:
+                    raw = await resp.json()
+                    # Coinbase returns newest first: [ [ time, low, high, open, close, volume ], ... ]
+                    candles = []
+                    for row in reversed(raw):
+                        if len(row) >= 6:
+                            ts, low, high, open_, close_, vol = row[0], row[1], row[2], row[3], row[4], row[5]
+                            candles.append({
+                                "time": int(ts),
+                                "open": float(open_),
+                                "high": float(high),
+                                "low": float(low),
+                                "close": float(close_),
+                                "volume": round(float(vol), 4)
+                            })
+                    return candles
         except Exception as e:
             logger.debug(f"Coinbase REST historical candles fetch failed for {product_id}: {e}")
         return []
@@ -121,16 +123,19 @@ class CoinbaseFeed:
                                     await self.on_tick(sym, price, size, side)
 
                                 if self.on_depth:
-                                    tick_step = 0.50 if price >= 10000 else (0.10 if price >= 1000 else 0.01)
-                                    bids = [
-                                        [round(price - (i * tick_step) - (tick_step / 2), 2), round(random.uniform(0.1, 4.0), 3)]
-                                        for i in range(1, 21)
-                                    ]
-                                    asks = [
-                                        [round(price + (i * tick_step) + (tick_step / 2), 2), round(random.uniform(0.1, 4.0), 3)]
-                                        for i in range(1, 21)
-                                    ]
-                                    await self.on_depth(sym, bids, asks, int(time.time() * 1000))
+                                    now = time.time()
+                                    if now - self._last_depth_ts.get(sym, 0.0) >= 0.25:
+                                        self._last_depth_ts[sym] = now
+                                        tick_step = 0.50 if price >= 10000 else (0.10 if price >= 1000 else 0.01)
+                                        bids = [
+                                            [round(price - (i * tick_step) - (tick_step / 2), 2), round(random.uniform(0.1, 4.0), 3)]
+                                            for i in range(1, 21)
+                                        ]
+                                        asks = [
+                                            [round(price + (i * tick_step) + (tick_step / 2), 2), round(random.uniform(0.1, 4.0), 3)]
+                                            for i in range(1, 21)
+                                        ]
+                                        await self.on_depth(sym, bids, asks, int(now * 1000))
 
             except Exception as e:
                 logger.warning(f"Coinbase WebSocket error: {e}. Reconnecting in {backoff}s...")

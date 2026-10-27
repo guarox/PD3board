@@ -17,6 +17,9 @@ from app.main import (
     get_insiders,
     get_holders,
     get_research,
+    get_polymarket,
+    get_version,
+    APP_VERSION,
 )
 from app.feeds.market_data_client import market_data_client
 
@@ -318,3 +321,51 @@ async def test_rest_endpoints():
 
     fdm = await get_fdm()
     assert len(fdm) >= 5
+
+    poly = await get_polymarket()
+    assert "markets" in poly
+    assert len(poly["markets"]) >= 3
+
+
+@pytest.mark.asyncio
+async def test_command_polymarket():
+    res = await execute_command(CommandRequest(command="POLY <GO>"))
+    assert res["success"] is True
+    poly = res["data"]
+    assert "markets" in poly
+    assert len(poly["markets"]) >= 3
+    first = poly["markets"][0]
+    assert "question" in first
+    assert "yes_price" in first
+    assert "no_price" in first
+    assert "probability_pct" in first
+    assert 0.0 < first["yes_price"] < 1.0
+    assert "volume_24h" in first
+    assert "liquidity" in first
+
+    # Verify filtered query via ticker prefix (e.g., "MACRO POLY <GO>")
+    res_filtered = await execute_command(CommandRequest(command="MACRO POLY <GO>"))
+    assert res_filtered["success"] is True
+    assert len(res_filtered["data"]["markets"]) >= 1
+@pytest.mark.asyncio
+async def test_get_version():
+    import os
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+
+    pd3_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    with open(os.path.join(pd3_root, "VERSION"), "r", encoding="utf-8") as f:
+        expected_version = f.read().strip()
+
+    # Direct function test
+    ver_res = await get_version()
+    assert ver_res == expected_version
+    assert ver_res == "1.2.0"
+    assert APP_VERSION == expected_version
+
+    # HTTP client endpoint test
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/VERSION")
+        assert response.status_code == 200
+        assert response.text == expected_version

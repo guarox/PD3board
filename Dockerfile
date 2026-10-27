@@ -14,9 +14,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ ./app/
 
 # Create non-root user
-RUN useradd -u 1000 -m -s /bin/bash pd3 && \
-    chown -R pd3:pd3 /app
-USER pd3
+RUN groupadd -g 1000 pd3 && \
+    useradd -u 1000 -g 1000 -m -s /bin/bash pd3 && \
+    chown -R 1000:1000 /app
+USER 1000:1000
 
 EXPOSE 8000
 

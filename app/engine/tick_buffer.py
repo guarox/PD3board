@@ -1,3 +1,4 @@
+import threading
 import time
 from collections import deque
 from typing import List, Dict, Any, Optional
@@ -29,40 +30,54 @@ class TickBuffer:
         self.max_ticks = max_ticks
         self.ticks = deque(maxlen=max_ticks)
         self.candles: Dict[int, Candle] = {}
+        self._lock = threading.RLock()
 
     def add_tick(self, price: float, size: float, side: str = "buy", timestamp: Optional[float] = None) -> Tick:
-        ts = timestamp if timestamp is not None else time.time()
-        tick = Tick(timestamp=ts, price=price, size=size, side=side)
-        self.ticks.append(tick)
+        with self._lock:
+            ts = timestamp if timestamp is not None else time.time()
+            tick = Tick(timestamp=ts, price=price, size=size, side=side)
+            self.ticks.append(tick)
 
-        # Aggregate into 1-minute candle
-        minute_bucket = int(ts // 60) * 60
-        if minute_bucket not in self.candles:
-            self.candles[minute_bucket] = Candle(
-                time=minute_bucket,
-                open=price,
-                high=price,
-                low=price,
-                close=price,
-                volume=size
-            )
-        else:
-            c = self.candles[minute_bucket]
-            c.high = max(c.high, price)
-            c.low = min(c.low, price)
-            c.close = price
-            c.volume += size
+            # Aggregate into 1-minute candle
+            minute_bucket = int(ts // 60) * 60
+            if minute_bucket not in self.candles:
+                self.candles[minute_bucket] = Candle(
+                    time=minute_bucket,
+                    open=price,
+                    high=price,
+                    low=price,
+                    close=price,
+                    volume=size
+                )
+            else:
+                c = self.candles[minute_bucket]
+                c.high = max(c.high, price)
+                c.low = min(c.low, price)
+                c.close = price
+                c.volume += size
 
-        if len(self.candles) > 3000:
-            oldest_keys = sorted(self.candles.keys())[:-2500]
-            for old_k in oldest_keys:
-                del self.candles[old_k]
+            if len(self.candles) > 3000:
+                oldest_keys = sorted(self.candles.keys())[:-2500]
+                for old_k in oldest_keys:
+                    del self.candles[old_k]
 
-        return tick
+            return tick
+
+    def upsert_candles(self, candles: List[Candle], max_candles: int = 3000) -> None:
+        with self._lock:
+            for candle in candles:
+                self.candles[candle.time] = candle
+            if len(self.candles) > max_candles:
+                keep = max(1, max_candles - 500) if max_candles > 500 else max_candles
+                oldest_keys = sorted(self.candles.keys())[:-keep]
+                for old_k in oldest_keys:
+                    del self.candles[old_k]
 
     def get_recent_ticks(self, count: int = 50) -> List[Dict[str, Any]]:
-        return [asdict(t) for t in list(self.ticks)[-count:]]
+        with self._lock:
+            return [asdict(t) for t in list(self.ticks)[-count:]]
 
     def get_candles(self, limit: int = 2500) -> List[Dict[str, Any]]:
-        sorted_times = sorted(self.candles.keys())[-limit:]
-        return [asdict(self.candles[t]) for t in sorted_times]
+        with self._lock:
+            sorted_times = sorted(self.candles.keys())[-limit:]
+            return [asdict(self.candles[t]) for t in sorted_times]

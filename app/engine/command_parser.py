@@ -6,17 +6,22 @@ FUNCTIONS = {
     "GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP",
     "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM",
     "OMON", "MAPS", "HEAT", "AI", "RES", "INSD", "HDS",
-    "LANG", "TRACE"
+    "LANG", "TRACE", "POLY", "PRED", "PM"
 }
 
 # Aliases
 FUNCTION_ALIASES = {
     "HEAT": "MAPS",
     "RES": "AI",
-    "TRACE": "LANG"
+    "TRACE": "LANG",
+    "PRED": "POLY",
+    "PM": "POLY"
 }
 
+VALID_TICKER_RE = re.compile(r"^[A-Z0-9.^=/_-]{1,16}$")
+
 class CommandParser:
+    VALID_TICKER_RE = VALID_TICKER_RE
     """
     Parses Bloomberg-style terminal commands:
     Pattern: <TICKER> [SECTOR] [FUNCTION] <GO>
@@ -54,6 +59,8 @@ class CommandParser:
         if len(tokens) >= 2 and tokens[0] in FUNCTIONS and tokens[1] not in FUNCTIONS and tokens[1] not in SECTORS:
             fn = FUNCTION_ALIASES.get(tokens[0], tokens[0])
             ticker = tokens[1]
+            if not VALID_TICKER_RE.match(ticker):
+                return {"valid": False, "error": f"Invalid ticker symbol: {ticker}"}
             sector = None
             if len(tokens) >= 3 and tokens[2] in SECTORS:
                 sector = tokens[2]
@@ -77,6 +84,8 @@ class CommandParser:
             }
 
         ticker = tokens[0]
+        if not VALID_TICKER_RE.match(ticker):
+            return {"valid": False, "error": f"Invalid ticker symbol: {ticker}"}
         sector = None
         function = "GP"  # Default function is Price Graph
 

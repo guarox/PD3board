@@ -283,6 +283,21 @@ class AiResearchContract(BaseModel):
     )
 
 
+class PolymarketContract(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    exchange: str = "POLYMARKET CLOB (POLYGON / QCX US DCM)"
+    settlement_asset: str = "USDC (ERC-1155 CTF)"
+    oracle: str = "UMA OPTIMISTIC ORACLE / CFTC DCM"
+    source: str = "POLYMARKET GAMMA + CLOB LIVE API"
+    active_markets_count: int = 0
+    total_volume_24h: float = 0.0
+    total_liquidity: float = 0.0
+    avg_spread_cents: float = 0.5
+    categories: Dict[str, int] = Field(default_factory=dict)
+    markets: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 CONTRACT_REGISTRY: Dict[str, Any] = {
     "DES": DesContract,
     "ANR": AnrContract,
@@ -300,6 +315,9 @@ CONTRACT_REGISTRY: Dict[str, Any] = {
     "HDS": HdsContract,
     "AI": AiResearchContract,
     "RES": AiResearchContract,
+    "POLY": PolymarketContract,
+    "PRED": PolymarketContract,
+    "PM": PolymarketContract,
 }
 
 
@@ -324,9 +342,10 @@ def normalize_contract_payload(fn: str, raw_data: Any, symbol: str = "") -> Dict
             raw_data = {"currencies": raw_data}
         elif fn_upper == "FDM":
             raw_data = {"commodities": raw_data}
+        elif fn_upper in ("POLY", "PRED", "PM"):
+            raw_data = {"markets": raw_data}
         else:
             raw_data = {"items": raw_data}
-
     if not isinstance(raw_data, dict):
         raw_data = {}
 
