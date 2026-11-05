@@ -719,7 +719,7 @@ async def get_orderbook(symbol: str):
 
 @app.get("/api/market-status")
 async def get_market_status():
-    term_id = os.getenv("TERMINAL_ID") or os.getenv("HOSTNAME") or "PD3-TALOS-01"
+    term_id = os.getenv("TERMINAL_ID") or os.getenv("HOSTNAME") or "PD3-WORKSTATION-01"
     return {
         "status": "success",
         "data": equities_feed.get_market_sessions(),
@@ -758,7 +758,7 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     active_connections.add(websocket)
     try:
-        term_id = os.getenv("TERMINAL_ID") or os.getenv("HOSTNAME") or "PD3-TALOS-01"
+        term_id = os.getenv("TERMINAL_ID") or os.getenv("HOSTNAME") or "PD3-WORKSTATION-01"
         # Send initial snapshot upon connection
         await websocket.send_text(json.dumps({
             "type": "market_status",

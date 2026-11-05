@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt httpx
+          pip install -r requirements.txt
 
-      - name: Run 7 pytest modules
+      - name: Run pytest suite
         run: PYTHONPATH=. pytest tests/test_*.py -v
