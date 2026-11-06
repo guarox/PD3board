@@ -14,11 +14,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.11 (GitHub Actions)
+        if: github.server_url == 'https://github.com'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
+
+      - name: Set up Python 3.11 (Forgejo Debian Bookworm Runner)
+        if: github.server_url != 'https://github.com'
+        run: |
+          if ! python3 -m venv --help >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update -qq
+            apt-get install -y -qq --no-install-recommends python3-venv python3-pip
+          fi
+          python3 -m venv /tmp/ci-venv
+          echo "/tmp/ci-venv/bin" >> "$GITHUB_PATH"
 
       - name: Install dependencies
         run: |
