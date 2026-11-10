@@ -643,7 +643,9 @@ class TerminalController {
         sector: this.currentSector,
         func: this.currentFunction,
         interval: this.priceChart ? this.priceChart.interval : '1M',
-        indicators: this.priceChart ? Array.from(this.priceChart.activeIndicators || []) : [],
+        indicators: this.priceChart && this.priceChart.indicators
+          ? Object.keys(this.priceChart.indicators).filter(k => this.priceChart.indicators[k])
+          : [],
         audio: this.sound ? this.sound.enabled : false,
         crt: document.getElementById('crtOverlay') ? document.getElementById('crtOverlay').style.display !== 'none' : true,
         clockMode: this.clockMode,
@@ -1838,7 +1840,7 @@ class TerminalController {
         const isAtm = row.is_atm;
         const isMaxPain = row.is_max_pain;
         const rowStyle = isAtm ? 'background: rgba(255, 176, 0, 0.12); font-weight: bold;' : (isMaxPain ? 'background: rgba(0, 240, 255, 0.1);' : '');
-        const strikeBadge = isAtm ? ' <span style="color: var(--amber-bright); font-size: 9px;">[ATM]</span>' : (isMaxPain ? ' <span style="color: #00f0ff; font-size: 9px;">[MAX PAIN]</span>' : '');
+        const strikeBadge = (isAtm ? ' <span style="color: var(--amber-bright); font-size: 9px;">[ATM]</span>' : '') + (isMaxPain ? ' <span style="color: #00f0ff; font-size: 9px;">[MAX PAIN]</span>' : '');
 
         rowsHtml += `
           <tr style="${rowStyle}">
@@ -2668,6 +2670,8 @@ class TerminalController {
     container.innerHTML = html;
   }
 }
+
+window.TerminalController = TerminalController;
 
 document.addEventListener('DOMContentLoaded', () => {
   window.terminal = new TerminalController();

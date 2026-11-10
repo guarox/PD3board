@@ -48,10 +48,9 @@ def _read_app_version() -> str:
     ver_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "VERSION")
     try:
         with open(ver_file, "r", encoding="utf-8") as f:
-            return f.read().strip() or "1.2.0"
+            return f.read().strip() or "1.2.1"
     except Exception:
-        return "1.2.0"
-
+        return "1.2.1"
 
 APP_VERSION = _read_app_version()
 app = FastAPI(title="PD3board Financial Workstation", version=APP_VERSION, lifespan=lifespan)
@@ -214,6 +213,21 @@ def get_or_create_tick_buffer(sym: str) -> TickBuffer:
 
     return tb
 
+def _get_orderbook_tick_and_decimals(price: float):
+    if price >= 10000:
+        return 0.50, 2
+    elif price >= 1000:
+        return 0.25, 2
+    elif price >= 100:
+        return 0.05, 2
+    elif price >= 10:
+        return 0.01, 2
+    elif price >= 2:
+        return 0.005, 3
+    elif price >= 0.1:
+        return 0.0001, 4
+    return 0.00001, 6
+
 def get_or_create_orderbook(sym: str) -> OrderBook:
     sym = sym.upper()
     with _state_lock:
@@ -228,27 +242,7 @@ def get_or_create_orderbook(sym: str) -> OrderBook:
         ob = orderbooks[sym]
     if not ob.bids or sym != Config.DEFAULT_CRYPTO:
         price = equities_feed.get_security_price(sym, prefer_live=True)
-        if price >= 10000:
-            tick = 0.50
-            dec = 2
-        elif price >= 1000:
-            tick = 0.25
-            dec = 2
-        elif price >= 100:
-            tick = 0.05
-            dec = 2
-        elif price >= 10:
-            tick = 0.01
-            dec = 2
-        elif price >= 2:
-            tick = 0.005
-            dec = 3
-        elif price >= 0.1:
-            tick = 0.0001
-            dec = 4
-        else:
-            tick = 0.00001
-            dec = 6
+        tick, dec = _get_orderbook_tick_and_decimals(price)
 
         raw_bids = []
         raw_asks = []
@@ -368,14 +362,14 @@ async def equities_broadcaster():
                     with _state_lock:
                         ob = orderbooks.get(sym)
                     if ob is not None and sym != Config.DEFAULT_CRYPTO:
-                        tick = 0.50 if price >= 10000 else (0.25 if price >= 1000 else (0.05 if price >= 100 else 0.01))
+                        tick, dec = _get_orderbook_tick_and_decimals(price)
                         raw_bids = []
                         raw_asks = []
                         for i in range(1, 11):
                             b_sz = round(15.0 + (hash(f"{sym}_b_{i}_{price}") % 75), 2)
                             a_sz = round(15.0 + (hash(f"{sym}_a_{i}_{price}") % 75), 2)
-                            raw_bids.append([round(price - i * tick, 2), b_sz])
-                            raw_asks.append([round(price + i * tick, 2), a_sz])
+                            raw_bids.append([round(price - i * tick, dec), b_sz])
+                            raw_asks.append([round(price + i * tick, dec), a_sz])
                         ob.update_levels(raw_bids, raw_asks, update_id=int(time.time() * 1000))
                         await broadcast({
                             "type": "depth",
@@ -756,7 +750,6 @@ async def get_ticks(symbol: str, interval: str = "1M"):
 @app.websocket("/ws/stream")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    active_connections.add(websocket)
     try:
         term_id = os.getenv("TERMINAL_ID") or os.getenv("HOSTNAME") or "PD3-WORKSTATION-01"
         # Send initial snapshot upon connection
@@ -789,6 +782,8 @@ async def websocket_endpoint(websocket: WebSocket):
             "type": "yield_curve",
             "data": await yield_curve_feed.get_curve_async()
         }))
+
+        active_connections.add(websocket)
 
         while True:
             raw_text = await websocket.receive_text()

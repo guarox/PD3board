@@ -363,12 +363,31 @@ class MarketDataClient:
         if cached is not None:
             return cached
 
+        mapped_sym = GLOBAL_SYMBOL_MAP.get(sym, sym)
+        is_fx_or_index_or_fut = (
+            mapped_sym.endswith("=X")
+            or mapped_sym.endswith("=F")
+            or mapped_sym.startswith("^")
+        )
         # Check if symbol is crypto: Tier 1 Coinbase, Tier 2 Kraken, Tier 3 Yahoo
-        is_crypto = any(sym.endswith(suffix) for suffix in ["USDT", "USD", "BTC", "ETH"]) and not sym.startswith("^")
+        is_crypto = (
+            not is_fx_or_index_or_fut
+            and (
+                mapped_sym.endswith("-USD")
+                or any(sym.endswith(suffix) for suffix in ["USDT", "USD", "BTC", "ETH"])
+            )
+        )
         if is_crypto:
-            cb_sym = sym.replace("USDT", "-USD")
-            if not "-" in cb_sym:
-                cb_sym = f"{cb_sym}-USD"
+            if mapped_sym.endswith("-USD"):
+                cb_sym = mapped_sym
+            elif sym.endswith("USDT"):
+                cb_sym = f"{sym[:-4]}-USD"
+            elif sym.endswith("USD") and not sym.endswith("-USD"):
+                cb_sym = f"{sym[:-3]}-USD"
+            elif "-" not in sym:
+                cb_sym = f"{sym}-USD"
+            else:
+                cb_sym = sym
             crypto_candles = await self.get_coinbase_candles(cb_sym)
             if crypto_candles:
                 self._set_cache(cache_key, crypto_candles, ttl_seconds=30)
@@ -380,9 +399,9 @@ class MarketDataClient:
                 return kraken_candles
 
         session = await self.get_session()
-        # Equities / Indices: Multi-cluster Yahoo fallback (query1 -> query2)
+        # Equities / Indices / FX / Futures: Multi-cluster Yahoo fallback (query1 -> query2)
         for host in ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]:
-            url = f"https://{host}/v8/finance/chart/{sym}?range={range_str}&interval={interval}&includePrePost=true"
+            url = f"https://{host}/v8/finance/chart/{mapped_sym}?range={range_str}&interval={interval}&includePrePost=true"
             try:
                 async with session.get(url, timeout=aiohttp.ClientTimeout(total=6)) as r:
                     if r.status == 200:

@@ -76,15 +76,36 @@ def test_contract_dual_representation_keys():
     assert fa["periods"] == ["2023", "2024", "2025"]
 
     # OMON
-    omon = normalize_contract_payload("OMON", {"chain": [{"strike": 100.0}]}, "SPY")
+    omon = normalize_contract_payload(
+        "OMON",
+        {
+            "expiry": "2026-12-18",
+            "max_pain_strike": 100.0,
+            "chain": [{"strike": 100.0, "is_atm": True, "iv": 25.0, "call_vol": 450, "put_vol": 320}],
+        },
+        "SPY",
+    )
     assert len(omon["chain"]) == 1
     assert len(omon["strikes"]) == 1
+    assert omon["expiration"] == "2026-12-18"
+    assert omon["atm_iv"] == 0.25
+    assert omon["chain"][0]["call_iv"] == 0.25
+    assert omon["chain"][0]["put_iv"] == 0.25
+    assert omon["chain"][0]["call_volume"] == 450
+    assert omon["chain"][0]["put_volume"] == 320
+    assert omon["chain"][0]["is_max_pain"] is True
 
-    # AI
-    ai = normalize_contract_payload("AI", {"rating": "BUY"}, "NVDA")
+    # AI (verify nested valuation_assessment preserves default keys)
+    ai = normalize_contract_payload(
+        "AI",
+        {"rating": "BUY", "valuation_assessment": {"fwd_pe": "28.4x"}},
+        "NVDA",
+    )
     assert ai["rating"] == "BUY"
     assert ai["recommendation"] == "BUY"
-
+    assert ai["valuation_assessment"]["fwd_pe"] == "28.4x"
+    assert "dividend_yield" in ai["valuation_assessment"]
+    assert "verdict" in ai["valuation_assessment"]
 
 @pytest.mark.asyncio
 async def test_command_msi_ee_and_des():
@@ -208,8 +229,139 @@ def test_frontend_html_tabs_and_version_cache_parity():
         assert fn in FUNCTIONS, f"Tab data-fn='{fn}' missing from CommandParser.FUNCTIONS"
         if fn not in workspace_tabs:
             assert f"fn === '{fn}'" in term_js, f"Modal tab data-fn='{fn}' missing explicit branch in terminal.js executeFunction()"
-
     assert not re.search(r"\}\s*else\s*\{\s*this\.closeModal\(\);\s*\}", term_js), (
         "Bare silent fallthrough else { this.closeModal(); } is prohibited in terminal.js"
     )
+    assert "this.priceChart.indicators" in term_js
 
+    with open(os.path.join(pd3_root, "Dockerfile"), "r", encoding="utf-8") as f:
+        dockerfile_txt = f.read()
+    assert "COPY VERSION ." in dockerfile_txt
+
+
+def test_e2e_dom_modal_and_orderbook_rendering():
+    """Execute frontend JS controllers in Node against contract payloads to verify DOM/SVG rendering."""
+    import json
+    import os
+    import shutil
+    import subprocess
+    from app.feeds.options import OptionsFeed
+    from app.feeds.polymarket import FALLBACK_POLYMARKET_MARKETS
+
+    pd3_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    omon_payload = normalize_contract_payload("OMON", OptionsFeed.get_options_chain("AAPL", 225.0), "AAPL")
+    assert omon_payload["atm_iv"] > 0
+    assert any(r.get("is_max_pain") for r in omon_payload["chain"])
+    assert all(r.get("call_iv", 0) > 0 and r.get("put_iv", 0) > 0 for r in omon_payload["chain"])
+    poly_payload = normalize_contract_payload("POLY", {"markets": FALLBACK_POLYMARKET_MARKETS[:3], "total_volume_24h": 11510000.0, "total_liquidity": 11250000.0, "avg_spread_cents": 0.47})
+    if not shutil.which("node"):
+        return
+    lang_payload = {
+        "enabled": True,
+        "host": "http://langfuse-web:3000",
+        "external_url": "https://langfuse.home.gilbertopina.com",
+        "total_traces": 3,
+        "recent_traces": [
+            {
+                "timestamp": "2026-11-10 00:15:00",
+                "symbol": "NVDA",
+                "company_name": "NVIDIA Corporation",
+                "rating": "OUTPERFORM",
+                "target_price": 160.0,
+                "upside_pct": 35.0,
+                "url": "https://langfuse.home.gilbertopina.com/traces/123",
+            }
+        ],
+    }
+
+    node_script = f"""
+const fs = require('fs');
+const elements = {{}};
+const getEl = (id) => {{
+  if (!elements[id]) {{
+    elements[id] = {{
+      id,
+      innerHTML: '',
+      innerText: '',
+      style: {{ display: 'block' }},
+      classList: {{ remove() {{}}, add() {{}}, toggle() {{ return false; }}, contains() {{ return false; }} }},
+      querySelector() {{ return {{}}; }},
+      querySelectorAll() {{ return []; }},
+      addEventListener() {{}},
+    }};
+  }}
+  return elements[id];
+}};
+global.window = {{ location: {{ protocol: 'http:', host: 'localhost:8000' }}, addEventListener() {{}}, dispatchEvent() {{}} }};
+global.document = {{
+  getElementById: getEl,
+  querySelectorAll() {{ return []; }},
+  addEventListener() {{}},
+}};
+const storage = {{}};
+global.localStorage = {{
+  setItem(k, v) {{ storage[k] = v; }},
+  getItem(k) {{ return storage[k] || null; }},
+}};
+
+eval(fs.readFileSync({json.dumps(os.path.join(pd3_root, "app/static/js/orderbook.js"))}, 'utf8'));
+eval(fs.readFileSync({json.dumps(os.path.join(pd3_root, "app/static/js/terminal.js"))}, 'utf8'));
+
+const proto = window.TerminalController ? window.TerminalController.prototype : TerminalController.prototype;
+const ctx = Object.create(proto);
+ctx.currentTicker = 'AAPL';
+ctx.currentSector = 'EQUITY';
+ctx.currentFunction = 'OMON';
+ctx.clockMode = 'EST';
+ctx.cmdHistory = ['AAPL OMON <GO>'];
+ctx.sound = {{ enabled: true }};
+ctx.priceChart = {{ interval: '5M', indicators: {{ SMA20: true, SMA50: false, BOLL: false, RSI: true, MACD: false }} }};
+
+// 1. Verify OMON modal & SVG Volatility Smile
+const omonData = {json.dumps(omon_payload)};
+ctx.showOmonModal(omonData);
+const omonHtml = getEl('modalBody').innerHTML;
+if (!omonHtml.includes('<svg') || !omonHtml.includes('<path d="M')) throw new Error('Missing OMON SVG smile path');
+if (omonHtml.includes('0.0%</div>')) throw new Error('OMON ATM IV rendered as 0.0%');
+if (!omonHtml.includes('[MAX PAIN]')) throw new Error('Missing [MAX PAIN] badge in OMON table');
+
+// 2. Verify POLY modal
+const polyData = {json.dumps(poly_payload)};
+ctx.showPolyModal(polyData);
+const polyHtml = getEl('modalBody').innerHTML;
+if (!polyHtml.includes('https://polymarket.com/event/fed-rate-cut-next-fomc')) throw new Error('Missing Polymarket event URL');
+if (!polyHtml.includes('$11.51M')) throw new Error('Missing formatted 24h volume in POLY modal');
+
+// 3. Verify LANG modal
+const langData = {json.dumps(lang_payload)};
+ctx.showLangfuseModal(langData);
+const langHtml = getEl('modalBody').innerHTML;
+if (!langHtml.includes('ONLINE // STREAMING') || !langHtml.includes('NVIDIA Corporation')) throw new Error('Missing Langfuse trace row');
+
+// 4. Verify saveState indicator persistence
+ctx.saveState();
+const saved = JSON.parse(storage['pd3board_state']);
+if (JSON.stringify(saved.indicators) !== JSON.stringify(['SMA20', 'RSI'])) {{
+  throw new Error('Indicator persistence failed: ' + JSON.stringify(saved.indicators));
+}}
+
+// 5. Verify OrderBookUI dynamic 4-decimal FX precision
+const obUI = new window.OrderBookUI('obTest');
+obUI.update({{
+  symbol: 'EURUSD',
+  best_bid: 1.1124,
+  best_ask: 1.1126,
+  spread: 0.0002,
+  spread_bps: 1.8,
+  bids: [{{ price: 1.1124, size: 10, total: 10 }}],
+  asks: [{{ price: 1.1126, size: 10, total: 10 }}],
+}});
+const obHtml = getEl('obTest').innerHTML;
+if (!obHtml.includes('1.1124') || !obHtml.includes('SPREAD: 0.0002')) {{
+  throw new Error('OrderBookUI failed 4-decimal FX formatting: ' + obHtml);
+}}
+console.log('E2E_DOM_OK');
+"""
+    proc = subprocess.run(["node", "-e", node_script], capture_output=True, text=True, check=False)
+    assert proc.returncode == 0, f"Node E2E DOM check failed: {proc.stderr or proc.stdout}"
+    assert "E2E_DOM_OK" in proc.stdout

@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 
 SECTORS = {"EQUITY", "CRNCY", "INDEX", "GOVT", "CMDTY"}
 FUNCTIONS = {
-    "GP", "GIP", "L2", "DES", "WEI", "TOP", "YCRV", "ECO", "HELP",
+    "GP", "GIP", "L2", "DES", "WEI", "TOP", "NEWS", "YCRV", "ECO", "HELP",
     "ANR", "FA", "RV", "EE", "WIRP", "WCRS", "FDM",
     "OMON", "MAPS", "HEAT", "AI", "RES", "INSD", "HDS",
     "LANG", "TRACE", "POLY", "PRED", "PM"
@@ -11,13 +11,13 @@ FUNCTIONS = {
 
 # Aliases
 FUNCTION_ALIASES = {
+    "NEWS": "TOP",
     "HEAT": "MAPS",
     "RES": "AI",
     "TRACE": "LANG",
     "PRED": "POLY",
     "PM": "POLY"
 }
-
 VALID_TICKER_RE = re.compile(r"^[A-Z0-9.^=/_-]{1,16}$")
 
 class CommandParser:

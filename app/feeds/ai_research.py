@@ -1,4 +1,5 @@
 import base64
+from concurrent.futures import ThreadPoolExecutor
 import datetime
 import json
 import logging
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Direct HTTP REST ingestion is enabled whenever keys and host are configured
 langfuse_enabled = bool(Config.LANGFUSE_PUBLIC_KEY and Config.LANGFUSE_SECRET_KEY and Config.LANGFUSE_HOST)
+_langfuse_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="langfuse_ingest")
 
 
 def _post_langfuse_ingestion_batch(batch: list) -> None:
@@ -136,21 +138,23 @@ class AIResearchFeed:
                     },
                 },
             ]
-            threading.Thread(target=_post_langfuse_ingestion_batch, args=(batch,), daemon=True).start()
+            _langfuse_executor.submit(_post_langfuse_ingestion_batch, batch)
 
         return memo
 
     @classmethod
     def get_langfuse_telemetry(cls) -> Dict[str, Any]:
+        with cls._trace_lock:
+            total_traces = cls._trace_count
+            recent_traces = list(reversed(cls._traces_history[-10:]))
         return {
             "enabled": langfuse_enabled,
             "host": Config.LANGFUSE_HOST,
             "external_url": Config.LANGFUSE_EXTERNAL_URL,
             "public_key_configured": bool(Config.LANGFUSE_PUBLIC_KEY),
-            "total_traces": cls._trace_count,
-            "recent_traces": list(reversed(cls._traces_history[-10:]))
+            "total_traces": total_traces,
+            "recent_traces": recent_traces
         }
-
     @classmethod
     def _is_crypto(cls, symbol: str) -> bool:
         sym = symbol.upper()
@@ -204,7 +208,9 @@ class AIResearchFeed:
                     "ev_ebitda": "N/A (Protocol Fee Revenue Multiples Apply)",
                     "peg_ratio": "N/A",
                     "free_cash_flow_yield": "3.24% (Staking Real Yield APR)",
-                    "balance_sheet_health": "Pristine - Zero Corporate Debt, Cryptographic Security"
+                    "dividend_yield": "3.24% (Native Staking Yield)",
+                    "balance_sheet_health": "Pristine - Zero Corporate Debt, Cryptographic Security",
+                    "verdict": "Attractive structural accumulation"
                 }
             }
             return cls._record_langfuse_trace(symbol, spot_price, memo)
@@ -247,7 +253,9 @@ class AIResearchFeed:
                     "ev_ebitda": "36.4x",
                     "peg_ratio": "0.95x (Compelling growth-adjusted entry)",
                     "free_cash_flow_yield": "2.85%",
-                    "balance_sheet_health": "Fortress - $34.8B Cash & Equivalents, Net Cash Positive"
+                    "dividend_yield": "0.03%",
+                    "balance_sheet_health": "Fortress - $34.8B Cash & Equivalents, Net Cash Positive",
+                    "verdict": "Compelling growth-adjusted valuation"
                 }
             }
             return cls._record_langfuse_trace(symbol, spot_price, memo)
@@ -284,7 +292,9 @@ class AIResearchFeed:
                 "ev_ebitda": "15.2x",
                 "peg_ratio": "1.45x",
                 "free_cash_flow_yield": "4.20%",
-                "balance_sheet_health": "Solid Investment Grade Balance Sheet"
+                "dividend_yield": "1.65%",
+                "balance_sheet_health": "Solid Investment Grade Balance Sheet",
+                "verdict": "Attractions on risk-adjusted return basis"
             }
         }
         return cls._record_langfuse_trace(symbol, spot_price, memo)
@@ -355,7 +365,9 @@ class AIResearchFeed:
                     "ev_ebitda": "16.4x",
                     "peg_ratio": f"{round(float(peg), 2)}x" if peg else "1.25x",
                     "free_cash_flow_yield": f"{fcf_yield}%",
-                    "balance_sheet_health": "Robust Institutional Grade Balance Sheet"
+                    "dividend_yield": f"{round(float(q.get('trailingAnnualDividendYield', 0.015) or 0.015) * 100, 2)}%",
+                    "balance_sheet_health": "Robust Institutional Grade Balance Sheet",
+                    "verdict": "Attractive institutional risk/reward" if upside >= 5.0 else "Fairly valued"
                 }
             }
             return cls._record_langfuse_trace(symbol, curr_spot, memo)

@@ -372,11 +372,40 @@ def normalize_contract_payload(fn: str, raw_data: Any, symbol: str = "") -> Dict
         elif "periods" in raw_data and "years" not in raw_data:
             raw_data["years"] = raw_data["periods"]
     elif fn_upper == "OMON":
+        if "expiry" in raw_data and "expiration" not in raw_data:
+            raw_data["expiration"] = raw_data["expiry"]
+        elif "expiration" in raw_data and "expiry" not in raw_data:
+            raw_data["expiry"] = raw_data["expiration"]
         if "chain" in raw_data and "strikes" not in raw_data:
             raw_data["strikes"] = raw_data["chain"]
         elif "strikes" in raw_data and "chain" not in raw_data:
             raw_data["chain"] = raw_data["strikes"]
-    elif fn_upper == "AI":
+        chain_rows = raw_data.get("chain", [])
+        max_pain_val = raw_data.get("max_pain_strike")
+        if isinstance(chain_rows, list):
+            for row in chain_rows:
+                if isinstance(row, dict):
+                    if "iv" in row and "call_iv" not in row:
+                        iv_val = float(row["iv"] or 0.0)
+                        row["call_iv"] = round(iv_val / 100.0, 4) if iv_val > 2.0 else round(iv_val, 4)
+                    if "iv" in row and "put_iv" not in row:
+                        iv_val = float(row["iv"] or 0.0)
+                        row["put_iv"] = round(iv_val / 100.0, 4) if iv_val > 2.0 else round(iv_val, 4)
+                    if "call_vol" in row and "call_volume" not in row:
+                        row["call_volume"] = row["call_vol"]
+                    elif "call_volume" in row and "call_vol" not in row:
+                        row["call_vol"] = row["call_volume"]
+                    if "put_vol" in row and "put_volume" not in row:
+                        row["put_volume"] = row["put_vol"]
+                    elif "put_volume" in row and "put_vol" not in row:
+                        row["put_vol"] = row["put_volume"]
+                    if max_pain_val is not None and "is_max_pain" not in row:
+                        row["is_max_pain"] = (row.get("strike") == max_pain_val)
+            if not raw_data.get("atm_iv") and chain_rows:
+                atm_row = next((r for r in chain_rows if isinstance(r, dict) and r.get("is_atm")), chain_rows[len(chain_rows) // 2])
+                if isinstance(atm_row, dict) and atm_row.get("call_iv"):
+                    raw_data["atm_iv"] = atm_row["call_iv"]
+    elif fn_upper in ("AI", "RES"):
         if "rating" in raw_data and "recommendation" not in raw_data:
             raw_data["recommendation"] = raw_data["rating"]
         elif "recommendation" in raw_data and "rating" not in raw_data:
@@ -402,9 +431,11 @@ def normalize_contract_payload(fn: str, raw_data: Any, symbol: str = "") -> Dict
         default_dict["symbol"] = target_sym
 
     merged = {**default_dict, **raw_data}
+    for k, default_val in default_dict.items():
+        if isinstance(default_val, dict) and isinstance(raw_data.get(k), dict):
+            merged[k] = {**default_val, **raw_data[k]}
     if "symbol" in merged and target_sym != "N/A":
         merged["symbol"] = target_sym
-
     try:
         validated = model_cls.model_validate(merged)
         return validated.model_dump()

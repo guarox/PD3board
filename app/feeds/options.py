@@ -122,20 +122,25 @@ class OptionsFeed:
             chain.append({
                 "strike": strike,
                 "is_atm": is_atm,
+                "is_max_pain": False,
                 "iv": round(iv * 100, 1),
+                "call_iv": round(iv, 4),
                 "call_bid": round(max(0.01, call_mid - call_spread), 2),
                 "call_ask": round(call_mid + call_spread, 2),
                 "call_last": call_mid,
                 "call_vol": call_vol,
+                "call_volume": call_vol,
                 "call_oi": call_oi,
                 "call_delta": round(call_delta, 3),
                 "call_gamma": round(gamma, 4),
                 "call_theta": round(call_theta, 3),
                 "call_vega": round(vega, 3),
+                "put_iv": round(max(0.12, min(0.85, iv + 0.012)), 4),
                 "put_bid": round(max(0.01, put_mid - put_spread), 2),
                 "put_ask": round(put_mid + put_spread, 2),
                 "put_last": put_mid,
                 "put_vol": put_vol,
+                "put_volume": put_vol,
                 "put_oi": put_oi,
                 "put_delta": round(put_delta, 3),
                 "put_gamma": round(gamma, 4),
@@ -156,6 +161,10 @@ class OptionsFeed:
             pain_values.append((test_strike, loss))
 
         max_pain = min(pain_values, key=lambda x: x[1])[0]
+        for row in chain:
+            row["is_max_pain"] = (row["strike"] == max_pain)
+        atm_row = next((r for r in chain if r.get("is_atm")), chain[len(chain) // 2] if chain else {})
+        atm_iv = round(float(atm_row.get("call_iv", 0.25)), 4)
         pc_ratio_oi = round(total_put_oi / total_call_oi, 2) if total_call_oi > 0 else 1.0
         pc_ratio_vol = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
 
@@ -164,8 +173,11 @@ class OptionsFeed:
             "spot_price": spot_price,
             "dte": dte,
             "expiry": "30D Forward",
+            "expiration": "30D Forward",
+            "atm_iv": atm_iv,
             "total_call_oi": total_call_oi,
             "total_put_oi": total_put_oi,
+            "put_call_ratio": pc_ratio_oi,
             "put_call_ratio_oi": pc_ratio_oi,
             "put_call_ratio_vol": pc_ratio_vol,
             "max_pain_strike": max_pain,
@@ -212,8 +224,12 @@ class OptionsFeed:
                     c = calls.get(strike, {})
                     p = puts.get(strike, {})
 
+                    c_iv_raw = float(c.get("impliedVolatility") or 0.0)
+                    p_iv_raw = float(p.get("impliedVolatility") or 0.0)
                     iv = float(c.get("impliedVolatility") or p.get("impliedVolatility") or 0.25)
                     iv = max(0.05, min(2.0, iv))
+                    c_iv = max(0.05, min(2.0, c_iv_raw if c_iv_raw > 0 else iv))
+                    p_iv = max(0.05, min(2.0, p_iv_raw if p_iv_raw > 0 else iv))
 
                     d1 = (math.log(curr_spot / strike) + (r + 0.5 * iv ** 2) * t) / (iv * math.sqrt(t))
                     d2 = d1 - iv * math.sqrt(t)
@@ -242,20 +258,25 @@ class OptionsFeed:
                     chain.append({
                         "strike": strike,
                         "is_atm": is_atm,
+                        "is_max_pain": False,
                         "iv": round(iv * 100, 1),
+                        "call_iv": round(c_iv, 4),
                         "call_bid": float(c.get("bid", 0.0) or 0.0),
                         "call_ask": float(c.get("ask", 0.0) or 0.0),
                         "call_last": float(c.get("lastPrice", 0.0) or 0.0),
                         "call_vol": c_vol,
+                        "call_volume": c_vol,
                         "call_oi": c_oi,
                         "call_delta": round(call_delta, 3),
                         "call_gamma": round(gamma, 4),
                         "call_theta": round(call_theta, 3),
                         "call_vega": round(vega, 3),
+                        "put_iv": round(p_iv, 4),
                         "put_bid": float(p.get("bid", 0.0) or 0.0),
                         "put_ask": float(p.get("ask", 0.0) or 0.0),
                         "put_last": float(p.get("lastPrice", 0.0) or 0.0),
                         "put_vol": p_vol,
+                        "put_volume": p_vol,
                         "put_oi": p_oi,
                         "put_delta": round(put_delta, 3),
                         "put_gamma": round(gamma, 4),
@@ -270,6 +291,11 @@ class OptionsFeed:
                     pain_values.append((test_strike, loss))
 
                 max_pain = min(pain_values, key=lambda x: x[1])[0] if pain_values else curr_spot
+                for row in chain:
+                    row["is_max_pain"] = (row["strike"] == max_pain)
+                atm_row = next((r for r in chain if r.get("is_atm")), chain[len(chain) // 2] if chain else {})
+                atm_iv = round(float(atm_row.get("call_iv", 0.25)), 4)
+                exp_str = time.strftime("%Y-%m-%d", time.gmtime(exp_date))
                 pc_ratio_oi = round(total_put_oi / total_call_oi, 2) if total_call_oi > 0 else 1.0
                 pc_ratio_vol = round(total_put_vol / total_call_vol, 2) if total_call_vol > 0 else 1.0
 
@@ -277,9 +303,12 @@ class OptionsFeed:
                     "symbol": symbol,
                     "spot_price": round(curr_spot, 2),
                     "dte": dte,
-                    "expiry": time.strftime("%Y-%m-%d", time.gmtime(exp_date)),
+                    "expiry": exp_str,
+                    "expiration": exp_str,
+                    "atm_iv": atm_iv,
                     "total_call_oi": total_call_oi,
                     "total_put_oi": total_put_oi,
+                    "put_call_ratio": pc_ratio_oi,
                     "put_call_ratio_oi": pc_ratio_oi,
                     "put_call_ratio_vol": pc_ratio_vol,
                     "max_pain_strike": max_pain,

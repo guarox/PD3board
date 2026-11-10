@@ -360,9 +360,8 @@ async def test_get_version():
     # Direct function test
     ver_res = await get_version()
     assert ver_res == expected_version
-    assert ver_res == "1.2.0"
+    assert ver_res == "1.2.1"
     assert APP_VERSION == expected_version
-
     # HTTP client endpoint test
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:

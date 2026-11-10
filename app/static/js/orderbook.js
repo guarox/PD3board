@@ -19,6 +19,13 @@ class OrderBookUI {
     topBids.forEach(b => { if (Number(b.total || 0) > maxTotal) maxTotal = Number(b.total || 0); });
     topAsks.forEach(a => { if (Number(a.total || 0) > maxTotal) maxTotal = Number(a.total || 0); });
 
+    const refPrice = Number(best_bid || best_ask || (topBids[0] && topBids[0].price) || 100);
+    let priceDec = 2;
+    if (refPrice > 0 && refPrice < 0.01) priceDec = 6;
+    else if (refPrice > 0 && refPrice < 0.5) priceDec = 5;
+    else if (refPrice > 0 && refPrice < 2) priceDec = 4;
+    else if (refPrice > 0 && refPrice < 20 && Math.abs(refPrice - Math.round(refPrice * 100) / 100) > 0.0001) priceDec = 3;
+
     let html = `
       <div class="depth-ladder">
         <div class="depth-header">
@@ -37,7 +44,7 @@ class OrderBookUI {
         <div class="depth-row">
           <div class="depth-bar depth-bar-ask" style="width: ${pct}%"></div>
           <div class="neg">${Number(a.size || 0).toFixed(4)}</div>
-          <div class="text-center neg">${Number(a.price || 0).toFixed(2)}</div>
+          <div class="text-center neg">${Number(a.price || 0).toFixed(priceDec)}</div>
           <div class="text-right neu">${Number(a.total || 0).toFixed(4)}</div>
         </div>
       `;
@@ -46,7 +53,7 @@ class OrderBookUI {
     // Spread Row
     html += `
       <div class="spread-row">
-        <span>SPREAD: ${Number(spread || 0).toFixed(2)} (${Number(spread_bps || 0).toFixed(1)} BPS)</span>
+        <span>SPREAD: ${Number(spread || 0).toFixed(priceDec)} (${Number(spread_bps || 0).toFixed(1)} BPS)</span>
       </div>
       <div class="bids-container">
     `;
@@ -58,7 +65,7 @@ class OrderBookUI {
         <div class="depth-row">
           <div class="depth-bar depth-bar-bid" style="width: ${pct}%"></div>
           <div class="pos">${Number(b.size || 0).toFixed(4)}</div>
-          <div class="text-center pos">${Number(b.price || 0).toFixed(2)}</div>
+          <div class="text-center pos">${Number(b.price || 0).toFixed(priceDec)}</div>
           <div class="text-right neu">${Number(b.total || 0).toFixed(4)}</div>
         </div>
       `;

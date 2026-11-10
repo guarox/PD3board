@@ -17,6 +17,11 @@ def test_parse_standalone_function():
         assert res["ticker"] is None
 
 def test_parse_aliases():
+    res_news = CommandParser.parse("NEWS <GO>")
+    assert res_news["valid"] is True
+    assert res_news["function"] == "TOP"
+    assert res_news["ticker"] is None
+
     res_heat = CommandParser.parse("HEAT <GO>")
     assert res_heat["valid"] is True
     assert res_heat["function"] == "MAPS"
@@ -33,6 +38,7 @@ def test_parse_aliases():
     assert res_pm["valid"] is True
     assert res_pm["ticker"] == "MACRO"
     assert res_pm["function"] == "POLY"
+
 def test_parse_inferred_sector():
     res_crypto = CommandParser.parse("BTCUSDT L2 <GO>")
     assert res_crypto["valid"] is True
